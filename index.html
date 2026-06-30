@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Reading Rabbit</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Source+Serif+4:wght@600;800&display=swap" rel="stylesheet">
 <style>
 * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
 
@@ -90,12 +90,15 @@ html, body {
 .book-pfill { height:100%; background:var(--accent); border-radius:2px; }
 .icon-btn   { background:none; border:none; cursor:pointer; padding:1vh; color:var(--muted); font-size:min(3vh,15px); }
 .icon-btn:active { color:var(--accent); }
+.book-actions { display:flex; align-items:center; gap:0.4vw; flex-shrink:0; }
 .book-finished {
   border-color:#d4af37;
   background:linear-gradient(135deg, color-mix(in srgb, #d4af37 14%, var(--surface)), var(--surface));
 }
 .book-finished .book-title { color:#d4af37; }
 .book-finished .book-pfill { background:#d4af37; }
+.book-finished .icon-btn { color:color-mix(in srgb, #d4af37 60%, var(--muted)); }
+.book-finished .icon-btn:active { color:#d4af37; }
 .empty-lib  { text-align:center; color:var(--muted); font-size:min(2.6vh,12px); margin-top:4vh; line-height:1.7; }
 
 /* ── SETTINGS ── */
@@ -159,14 +162,14 @@ html, body {
   padding:1.6vh 4vw 0;
 }
 .reader-wpm, .reader-percent {
-  font-size:min(2.8vh,14px); font-weight:700; color:var(--text);
+  font-weight:700;
   letter-spacing:0.02em;
 }
 .digital-readout {
-  font-family:'VT323', monospace;
+  font-family:'Share Tech Mono', monospace;
   color:var(--accent);
-  font-size:min(4.2vh,22px);
-  letter-spacing:0.04em;
+  font-size:min(5vh,26px);
+  letter-spacing:0.06em;
   text-shadow:0 0 6px color-mix(in srgb, var(--accent) 55%, transparent);
 }
 .reader-menu-btn {
@@ -185,19 +188,24 @@ html, body {
   overflow:hidden;
 }
 
-/* Focus guide: a subtle horizontal line above and below the word,
-   connected by a short vertical tick that spans only the gap between
-   them (not the full stage height) — a gentle "I-beam" crosshair
-   rather than a heavy full-length line. Position/height set live by
+/* Focus guide: thicker, rounded-cap horizontal lines above and below
+   the word (pill-shaped ends, not thin full-width rules), with a small
+   accent-colored triangle pointing down at the pivot letter instead of
+   a vertical line running through the text. Position is set live by
    JS to track the word's actual center + vertical offset. */
 .focus-hline-top, .focus-hline-bot {
-  position:absolute; left:10%; right:10%; height:1px;
-  background:var(--muted); opacity:0.3; pointer-events:none;
+  position:absolute; left:14%; right:14%; height:3px;
+  background:var(--muted); opacity:0.35; border-radius:2px;
+  pointer-events:none;
 }
-.focus-tick {
-  position:absolute; left:50%; width:1px;
-  background:var(--muted); opacity:0.3;
-  transform:translateX(-50%); pointer-events:none;
+.focus-pointer {
+  position:absolute; left:50%; width:0; height:0;
+  border-left:6px solid transparent;
+  border-right:6px solid transparent;
+  border-top:8px solid var(--accent);
+  opacity:0.9;
+  transform:translateX(-50%);
+  pointer-events:none;
 }
 
 /*
@@ -217,8 +225,9 @@ html, body {
   align-items:center;
   white-space:nowrap;
   line-height:1;
+  font-family:'Source Serif 4', Georgia, 'Times New Roman', serif;
   font-weight:800;
-  letter-spacing:-0.02em;
+  letter-spacing:-0.01em;
   will-change:transform;
 }
 .word-before { color:var(--text); }
@@ -412,12 +421,12 @@ html, body {
   <div class="reader-topbar">
     <button class="reader-menu-btn" onclick="openReaderMenu()">⋮</button>
     <div class="reader-wpm digital-readout" id="reader-wpm-label">250 WPM</div>
-    <div class="reader-percent" id="reader-percent">0%</div>
+    <div class="reader-percent digital-readout" id="reader-percent">0%</div>
   </div>
 
   <div class="word-stage" id="word-stage">
     <div class="swipe-hint" id="swipe-hint">WPM ↕</div>
-    <div class="focus-tick" id="focus-tick" style="display:none;"></div>
+    <div class="focus-pointer" id="focus-pointer" style="display:none;"></div>
     <div class="focus-hline-top" id="focus-hline-top" style="display:none;"></div>
     <div class="focus-hline-bot" id="focus-hline-bot" style="display:none;"></div>
 
@@ -743,11 +752,31 @@ function renderLibrary() {
         <div class="book-pbar"><div class="book-pfill" style="width:${finished ? 100 : prog}%"></div></div>
       </div>
       <div class="book-actions">
-        <button class="icon-btn" onclick="event.stopPropagation();deleteBook('${book.id}')">🗑</button>
+        <button class="icon-btn" title="${finished ? 'Mark as unread' : 'Mark as finished'}"
+                onclick="event.stopPropagation();toggleBookFinished('${book.id}')">${finished ? '↺' : '✓'}</button>
+        <button class="icon-btn" title="Delete" onclick="event.stopPropagation();deleteBook('${book.id}')">🗑</button>
       </div>`;
     div.onclick = () => startBook(book.id);
     list.appendChild(div);
   });
+}
+
+// Toggle a book between finished and unread directly from the library,
+// without needing to open it. Adding/removing it from state.log is the
+// single source of truth that drives the gold "finished" styling.
+function toggleBookFinished(bookId) {
+  const book = state.books.find(b => b.id === bookId);
+  if (!book) return;
+  const idx = state.log.findIndex(l => l.id === bookId);
+  if (idx >= 0) {
+    state.log.splice(idx, 1);
+    showToast(`"${book.title}" marked unread`);
+  } else {
+    state.log.push({ id: book.id, title: book.title, finishedAt: new Date().toISOString() });
+    showToast(`"${book.title}" marked finished`);
+  }
+  saveState();
+  renderLibrary();
 }
 
 function deleteBook(id) {
@@ -781,7 +810,7 @@ function currentFontPx() {
 }
 
 function getFontString(px) {
-  return `800 ${px}px -apple-system, 'SF Pro Display', 'Helvetica Neue', sans-serif`;
+  return `800 ${px}px 'Source Serif 4', Georgia, 'Times New Roman', serif`;
 }
 
 function measureText(text, px) {
@@ -842,7 +871,7 @@ function layoutWord(raw) {
 
 function applyGuide() {
   const show = state.guide;
-  document.getElementById('focus-tick').style.display      = show ? 'block' : 'none';
+  document.getElementById('focus-pointer').style.display   = show ? 'block' : 'none';
   document.getElementById('focus-hline-top').style.display = show ? 'block' : 'none';
   document.getElementById('focus-hline-bot').style.display = show ? 'block' : 'none';
 }
@@ -860,11 +889,11 @@ function positionFocusGuide(rowH) {
   const gap = rowH / 2 + rowH * 0.22; // small breathing room around the word
   const top = document.getElementById('focus-hline-top');
   const bot = document.getElementById('focus-hline-bot');
-  const tick = document.getElementById('focus-tick');
+  const pointer = document.getElementById('focus-pointer');
   top.style.top = (wordCenterY - gap) + 'px';
   bot.style.top = (wordCenterY + gap) + 'px';
-  tick.style.top = (wordCenterY - gap) + 'px';
-  tick.style.height = (gap * 2) + 'px';
+  // Pointer sits just beneath the top line, tip aiming down at the pivot letter
+  pointer.style.top = (wordCenterY - gap + 1) + 'px';
 }
 
 function startBook(bookId, fromIndex) {
@@ -1126,6 +1155,9 @@ function formatDate(iso) {
 loadBooks();
 applyTheme(state.theme);
 renderHome();
+if (document.fonts && document.fonts.ready) {
+  document.fonts.ready.then(() => { if (lastWord !== null) layoutWord(lastWord); });
+}
 </script>
 </body>
 </html>
