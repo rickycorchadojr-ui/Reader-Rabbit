@@ -231,12 +231,12 @@ html, body {
 .word-row {
   position:absolute;
   display:inline-flex;
-  align-items:baseline;
+  align-items:center;
   white-space:nowrap;
   line-height:1;
   font-weight:800;
   letter-spacing:-0.02em;
-  /* top/left set by JS */
+  /* top/left/transform set by JS */
 }
 
 .word-before { color:var(--text); }
@@ -463,7 +463,7 @@ html, body {
   <div class="reader-menu-overlay hidden" id="reader-menu">
     <div style="display:flex;align-items:center;justify-content:space-between;">
       <h3 id="reader-menu-title">Reading</h3>
-      <button class="btn btn-ghost" style="padding:3px 7px;" onclick="closeReaderMenu()">✕</button>
+      <button class="btn btn-ghost" style="padding:3px 7px;" onclick="backToReading()">✕</button>
     </div>
     <div class="setting-group">
       <div class="setting-row slider-row">
@@ -481,7 +481,7 @@ html, body {
       <button class="btn btn-secondary" onclick="exitToLibrary()">Library</button>
     </div>
     <div style="margin-top:auto;">
-      <button class="btn btn-ghost" onclick="closeReaderMenu()">← Back to reading</button>
+      <button class="btn btn-ghost" onclick="backToReading()">← Back to reading</button>
     </div>
   </div>
 </div>
@@ -530,15 +530,13 @@ const APP_W = 667, APP_H = 375;
 const appEl = document.getElementById('app');
 
 function rescale() {
+  // Fixed aspect ratio (667×375), never rotated — just scaled down to
+  // fit whatever space is available, letterboxed if needed. The phone's
+  // physical orientation or OS rotation lock has no effect on this.
   const sw = window.innerWidth, sh = window.innerHeight;
-  const isPortrait = sh > sw;
-  // Long edge / short edge
-  const availW = isPortrait ? sh : sw;
-  const availH = isPortrait ? sw : sh;
-  const scale = Math.min(availW / APP_W, availH / APP_H);
-  const angle = isPortrait ? 90 : 0;
+  const scale = Math.min(sw / APP_W, sh / APP_H);
   appEl.style.transformOrigin = 'center center';
-  appEl.style.transform = `rotate(${angle}deg) scale(${scale})`;
+  appEl.style.transform = `scale(${scale})`;
 }
 rescale();
 window.addEventListener('resize', rescale);
@@ -839,30 +837,27 @@ function updateWordRowFont() {
 }
 
 /*
-  positionWordRow: given the pivot index into the word string,
-  position the word row so the pivot letter's left edge sits
-  at horizontal center of the stage, and the word baseline
-  sits at vertical center + wordOffset.
+  positionWordRow: centers the PIVOT LETTER ITSELF (not its left edge)
+  at the exact horizontal center of the stage, and centers the row
+  itself vertically at the stage's vertical center + wordOffset.
+
+  Approach: anchor the row's top-left at (50%, 50%) of the stage via
+  CSS, then use a transform to shift it left by exactly
+  (beforeWidth + pivotWidth/2) and up by half the row's own rendered
+  height (so the row — and therefore its visual middle — sits on the
+  vertical center line). This avoids any fragile cap-height guesswork:
+  whatever font metrics render, the pivot's horizontal midpoint and the
+  row's vertical midpoint always land on the stage's true center pixel.
 */
-function positionWordRow(beforeWidth) {
+function positionWordRow(beforeWidth, pivotWidth) {
   const row = document.getElementById('word-row');
-  const stageX = STAGE_W / 2;          // horizontal center of stage
-  const stageY = STAGE_H / 2;          // vertical center of stage
-  const fs = state.fontSize;
-
-  // left: put pivot's left edge at stage center minus beforeWidth
-  const left = stageX - beforeWidth;
-
-  // top: position so the cap-height midpoint is at stageY + offset
-  // font cap height ≈ 0.72 × fontSize, so midpoint from top of glyph ≈ 0.36 × fontSize
-  // We want baseline - 0.36*fs = stageY + offset  →  top = stageY + offset - 0.64*fs
-  // (row is positioned by its top-left corner, baseline = top + fontSize roughly)
-  const capMid = fs * 0.36; // distance from top of letter to its visual midpoint
-  const top = stageY + state.wordOffset - capMid - (fs * 0.28);
-  // 0.28 extra offset upward because CSS top positions the text's ascender region
-
-  row.style.left = left + 'px';
-  row.style.top  = top  + 'px';
+  pivotWidth = pivotWidth || 0;
+  const rowH = row.offsetHeight || state.fontSize;
+  const shiftX = beforeWidth + pivotWidth / 2;
+  const shiftY = rowH / 2 - state.wordOffset;
+  row.style.left = '50%';
+  row.style.top  = '50%';
+  row.style.transform = `translate(${-shiftX}px, ${-shiftY}px)`;
 }
 
 function layoutWord(raw) {
@@ -882,12 +877,14 @@ function layoutWord(raw) {
   document.getElementById('word-pivot').textContent  = pivot;
   document.getElementById('word-after').textContent  = after;
 
-  // Measure before-text width to know how far left to shift
+  // Measure before-text width to know how far left to shift, plus the
+  // pivot letter's own width so we can center IT, not just its edge
   const beforeW = measureText(before, fs);
+  const pivotW  = measureText(pivot, fs);
 
   // Apply font size to row, then position
   updateWordRowFont();
-  positionWordRow(beforeW);
+  positionWordRow(beforeW, pivotW);
 }
 
 function applyGuide() {
@@ -1043,12 +1040,24 @@ function showPause() { document.getElementById('pause-overlay').classList.remove
 function hidePause() { document.getElementById('pause-overlay').classList.add('hidden'); }
 
 function openReaderMenu() {
-  pause();
+  // Stop playback without surfacing the pause overlay — showing both the
+  // pause screen AND the menu on top of each other was the source of the
+  // cluttered, layered look when opening the menu.
+  stopPlayback();
+  state.currentWordIndex = wordIndex;
+  saveState();
+  hidePause();
   const book = state.books.find(b => b.id === currentBookId);
   document.getElementById('reader-menu-title').textContent = book ? book.title : 'Reading';
   document.getElementById('reader-menu').classList.remove('hidden');
 }
-function closeReaderMenu() { document.getElementById('reader-menu').classList.add('hidden'); }
+function closeReaderMenu() {
+  document.getElementById('reader-menu').classList.add('hidden');
+}
+function backToReading() {
+  closeReaderMenu();
+  play();
+}
 
 function updateReaderWpmSlider() {
   document.getElementById('reader-wpm-slider').value = wpm;
