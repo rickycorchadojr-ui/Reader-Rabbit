@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Reading Rabbit</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Source+Serif+4:wght@600;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Source+Serif+4:wght@600;800&display=swap" rel="stylesheet">
 <style>
 * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
 
@@ -166,12 +166,12 @@ html, body {
   letter-spacing:0.02em;
 }
 .digital-readout {
-  font-family:inherit;
+  font-family:'Press Start 2P', monospace;
   color:var(--text);
-  font-size:min(3.4vh,17px);
-  font-weight:700;
-  letter-spacing:0.01em;
+  font-size:min(4.4vh,22px);
+  letter-spacing:0.02em;
 }
+.reader-wpm.digital-readout { color:var(--accent); }
 .reader-menu-btn {
   background:none; border:none; cursor:pointer;
   width:max(11vw,44px); height:max(11vw,44px);
@@ -824,17 +824,19 @@ function layoutWord(raw) {
   // Base font size from settings, converted to real px right now
   let px = currentFontPx();
 
-  const pivotIdx = getPivotIndex(raw);
-  const before = raw.slice(0, pivotIdx);
-  const pivot  = raw.slice(pivotIdx, pivotIdx + 1);
-  const after  = raw.slice(pivotIdx + 1);
-
-  // Auto-shrink if the full word would overflow the stage width
+  // Auto-shrink if the full word would overflow the stage width.
+  // Do this BEFORE picking the pivot letter, since the pivot is chosen
+  // by measuring actual rendered pixel widths at the final font size.
   const fullW = measureText(raw, px);
   const maxW = stageW * 0.92;
   if (fullW > maxW && fullW > 0) {
     px = Math.max(14, px * (maxW / fullW));
   }
+
+  const pivotIdx = getPivotIndexByWidth(raw, px);
+  const before = raw.slice(0, pivotIdx);
+  const pivot  = raw.slice(pivotIdx, pivotIdx + 1);
+  const after  = raw.slice(pivotIdx + 1);
 
   document.getElementById('word-before').textContent = before;
   document.getElementById('word-pivot').textContent  = pivot;
@@ -955,18 +957,33 @@ function showWord(idx) {
 }
 
 /*
-  getPivotIndex — Optimal Recognition Point (ORP).
-  Word length → pivot (0-indexed letter):
-    1 → 0, 2–5 → 1, 6–9 → 2, 10–13 → 3, 14+ → 4
+  getPivotIndexByWidth — finds the letter whose rendered pixel CENTER
+  is closest to the rendered pixel center of the whole word, measured
+  at the actual font size the word will display at. This is what makes
+  highlighting land on the true visual middle instead of an
+  approximate "middle character index" — important for words with a
+  mix of wide and narrow letters, and especially for long compound
+  words where a one- or two-character miscount would put the highlight
+  visibly off-center.
 */
-function getPivotIndex(word) {
-  const clean = word.replace(/[^a-zA-Z0-9]/g,'');
-  const len = clean.length;
+function getPivotIndexByWidth(word, px) {
+  const len = word.length;
   if (len <= 1) return 0;
-  if (len <= 5) return 1;
-  if (len <= 9) return 2;
-  if (len <= 13) return 3;
-  return 4;
+
+  const totalW = measureText(word, px);
+  const target = totalW / 2;
+
+  let cumulative = 0;
+  let bestIdx = 0;
+  let bestDist = Infinity;
+  for (let i = 0; i < len; i++) {
+    const charW = measureText(word[i], px);
+    const charCenter = cumulative + charW / 2;
+    const dist = Math.abs(charCenter - target);
+    if (dist < bestDist) { bestDist = dist; bestIdx = i; }
+    cumulative += charW;
+  }
+  return bestIdx;
 }
 
 function finishBook() {
