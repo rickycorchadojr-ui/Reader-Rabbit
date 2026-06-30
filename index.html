@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Reading Rabbit</title>
 <style>
 * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
@@ -11,17 +11,20 @@ html, body {
   width:100%; height:100%;
   overflow:hidden;
   background:#000;
-  display:flex; align-items:center; justify-content:center;
 }
 
 /*
-  #app is always the iPhone SE landscape viewport: 667×375.
-  JS scales it to fill whatever screen is available.
+  #app simply fills whatever viewport it's given. No fixed canvas size,
+  no scale(), no rotate() — the layout below is written with vw/vh units
+  and flexbox so it is correct at any real screen size or orientation
+  without any transform tricks. This is what makes "nothing rotates /
+  nothing goes off-screen" actually true rather than simulated.
 */
 #app {
-  position:relative;
-  width:667px;
-  height:375px;
+  position:fixed;
+  inset:0;
+  width:100%;
+  height:100%;
   overflow:hidden;
   font-family: -apple-system, 'SF Pro Display', 'Helvetica Neue', sans-serif;
   user-select:none;
@@ -47,278 +50,236 @@ html, body {
 
 /* ── SHARED COMPONENTS ── */
 .btn {
-  padding:10px 20px; border-radius:22px; font-size:13px; font-weight:600;
+  padding:2.4vh 4vw; border-radius:6vh; font-size:min(3.6vh,16px); font-weight:600;
   border:none; cursor:pointer; font-family:inherit;
   transition:opacity 0.15s, transform 0.1s;
+  white-space:nowrap;
 }
 .btn:active { transform:scale(0.95); opacity:0.8; }
 .btn-primary  { background:var(--accent); color:#fff; }
 .btn-secondary{ background:var(--surface); color:var(--text); border:1px solid var(--border); }
-.btn-ghost    { background:transparent; color:var(--muted); font-size:12px; border:none; cursor:pointer; padding:8px 10px; font-family:inherit; }
+.btn-ghost    { background:transparent; color:var(--muted); font-size:min(3.2vh,14px); border:none; cursor:pointer; padding:1.6vh 2.6vw; font-family:inherit; }
 
 /* ── HOME ── */
-#home { align-items:center; justify-content:center; gap:14px; padding:20px; }
+#home { align-items:center; justify-content:center; gap:2vh; padding:4vh 5vw; }
 .app-title {
-  font-size:42px; font-weight:800; letter-spacing:-1.5px; color:var(--text);
-  line-height:1;
+  font-size:min(8vh,46px); font-weight:800; letter-spacing:-0.03em; color:var(--text);
+  line-height:1; text-align:center;
 }
 .app-title .accent { color:var(--accent); }
-.home-actions { display:flex; gap:10px; flex-wrap:wrap; justify-content:center; margin-top:4px; }
+.home-actions { display:flex; gap:2vw; flex-wrap:wrap; justify-content:center; margin-top:1vh; }
+#resume-row { min-height:5vh; }
 
 /* ── LIBRARY ── */
-#library { padding:12px 14px; gap:8px; }
+#library { padding:3vh 4vw; gap:1.4vh; }
 .lib-header { display:flex; align-items:center; justify-content:space-between; flex-shrink:0; }
-.lib-header h2 { font-size:16px; font-weight:700; }
-.book-list { display:flex; flex-direction:column; gap:7px; overflow-y:auto; flex:1; }
+.lib-header h2 { font-size:min(3.6vh,18px); font-weight:700; }
+.book-list { display:flex; flex-direction:column; gap:1.2vh; overflow-y:auto; flex:1; min-height:0; }
 .book-card {
-  background:var(--surface); border:1px solid var(--border); border-radius:11px;
-  padding:9px 12px; display:flex; align-items:center; justify-content:space-between;
+  background:var(--surface); border:1px solid var(--border); border-radius:1.8vh;
+  padding:1.6vh 3vw; display:flex; align-items:center; justify-content:space-between;
   cursor:pointer; flex-shrink:0;
 }
 .book-card:active { opacity:0.7; }
 .book-info { flex:1; min-width:0; }
-.book-title { font-size:13px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.book-meta  { font-size:11px; color:var(--muted); margin-top:1px; }
-.book-pbar  { height:2px; background:var(--border); border-radius:2px; margin-top:5px; overflow:hidden; }
+.book-title { font-size:min(2.8vh,14px); font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.book-meta  { font-size:min(2.2vh,11px); color:var(--muted); margin-top:0.4vh; }
+.book-pbar  { height:0.4vh; background:var(--border); border-radius:2px; margin-top:0.8vh; overflow:hidden; }
 .book-pfill { height:100%; background:var(--accent); border-radius:2px; }
-.icon-btn   { background:none; border:none; cursor:pointer; padding:4px; color:var(--muted); font-size:15px; }
+.icon-btn   { background:none; border:none; cursor:pointer; padding:1vh; color:var(--muted); font-size:min(3vh,15px); }
 .icon-btn:active { color:var(--accent); }
-.empty-lib  { text-align:center; color:var(--muted); font-size:12px; margin-top:20px; line-height:1.7; }
+.empty-lib  { text-align:center; color:var(--muted); font-size:min(2.6vh,12px); margin-top:4vh; line-height:1.7; }
 
 /* ── SETTINGS ── */
-#settings { padding:12px 14px; gap:9px; overflow-y:auto; }
+#settings { padding:3vh 4vw; gap:1.6vh; overflow-y:auto; }
 .settings-header { display:flex; align-items:center; justify-content:space-between; flex-shrink:0; }
-.settings-header h2 { font-size:16px; font-weight:700; }
-.setting-group { background:var(--surface); border:1px solid var(--border); border-radius:11px; overflow:hidden; flex-shrink:0; }
+.settings-header h2 { font-size:min(3.6vh,18px); font-weight:700; }
+.setting-group { background:var(--surface); border:1px solid var(--border); border-radius:1.8vh; overflow:hidden; flex-shrink:0; }
 .setting-row {
   display:flex; align-items:center; justify-content:space-between;
-  padding:10px 12px; border-bottom:1px solid var(--border);
+  padding:1.8vh 3vw; border-bottom:1px solid var(--border);
 }
 .setting-row:last-child { border-bottom:none; }
-.setting-label { font-size:13px; }
-.setting-label small { display:block; font-size:10px; color:var(--muted); margin-top:1px; }
+.setting-label { font-size:min(2.8vh,13px); }
+.setting-label small { display:block; font-size:min(2vh,10px); color:var(--muted); margin-top:0.2vh; }
 .toggle {
-  width:42px; height:24px; background:var(--border); border-radius:12px;
+  width:7vw; max-width:42px; height:3.6vh; max-height:24px; background:var(--border); border-radius:2vh;
   position:relative; cursor:pointer; border:none; flex-shrink:0; transition:background 0.2s;
 }
 .toggle.on { background:var(--accent); }
 .toggle::after {
   content:''; position:absolute; top:2px; left:2px;
-  width:20px; height:20px; background:#fff; border-radius:50%;
+  width:calc(3.6vh - 4px); max-width:20px; height:calc(3.6vh - 4px); max-height:20px; background:#fff; border-radius:50%;
   transition:transform 0.2s; box-shadow:0 1px 3px rgba(0,0,0,0.25);
 }
-.toggle.on::after { transform:translateX(18px); }
-.val-label { font-size:13px; font-weight:700; color:var(--accent); min-width:60px; text-align:right; }
+.toggle.on::after { transform:translateX(calc(7vw - 3.6vh)); }
+.val-label { font-size:min(2.8vh,13px); font-weight:700; color:var(--accent); min-width:15vw; text-align:right; }
 .range-input {
-  -webkit-appearance:none; appearance:none; width:100%; height:4px;
-  background:var(--border); border-radius:2px; outline:none; margin:7px 0 2px;
+  -webkit-appearance:none; appearance:none; width:100%; height:0.6vh;
+  background:var(--border); border-radius:2px; outline:none; margin:1.4vh 0 0.4vh;
 }
 .range-input::-webkit-slider-thumb {
-  -webkit-appearance:none; width:20px; height:20px; border-radius:50%;
+  -webkit-appearance:none; width:3.6vh; height:3.6vh; max-width:20px; max-height:20px; border-radius:50%;
   background:var(--accent); cursor:pointer; box-shadow:0 1px 4px rgba(0,0,0,0.3);
 }
 .slider-row { flex-direction:column; align-items:flex-start; }
 .slider-labels { display:flex; justify-content:space-between; width:100%; }
-.slider-labels span { font-size:10px; color:var(--muted); }
-.theme-picker { display:flex; gap:7px; }
+.slider-labels span { font-size:min(2vh,10px); color:var(--muted); }
+.theme-picker { display:flex; gap:1.4vw; }
 .theme-chip {
-  padding:5px 12px; border-radius:13px; font-size:11px; font-weight:600;
+  padding:1vh 2.6vw; border-radius:2.6vh; font-size:min(2.2vh,11px); font-weight:600;
   cursor:pointer; border:1.5px solid transparent;
 }
 .theme-chip.dark   { background:#1a1a1a; color:#f0f0f0; }
 .theme-chip.nature { background:#f5f0e8; color:#1a1a1a; border-color:#d8d0c4; }
 .theme-chip.selected { border-color:var(--accent); }
 .log-section { flex:1; overflow-y:auto; min-height:0; }
-.log-title { font-size:10px; font-weight:600; letter-spacing:0.1em; text-transform:uppercase; color:var(--muted); margin-bottom:7px; }
-.log-item { background:var(--surface); border:1px solid var(--border); border-radius:9px; padding:8px 11px; margin-bottom:5px; }
-.log-item-title { font-size:12px; font-weight:600; }
-.log-item-date  { font-size:10px; color:var(--muted); margin-top:1px; }
+.log-title { font-size:min(2vh,10px); font-weight:600; letter-spacing:0.1em; text-transform:uppercase; color:var(--muted); margin-bottom:1.2vh; }
+.log-item { background:var(--surface); border:1px solid var(--border); border-radius:1.6vh; padding:1.4vh 2.6vw; margin-bottom:1vh; }
+.log-item-title { font-size:min(2.4vh,12px); font-weight:600; }
+.log-item-date  { font-size:min(2vh,10px); color:var(--muted); margin-top:0.2vh; }
 
 /* ── READER ── */
-#reader { background:var(--bg); position:relative; }
-
+/* Reader is a column: topbar (fixed height) / word-stage (fills the rest,
+   this is the majority of the screen) / bottom strip (fixed height).
+   Nothing here is absolutely positioned against a fictitious canvas size,
+   so nothing can land off-screen. */
+#reader { background:var(--bg); }
 .reader-topbar {
-  position:absolute; top:0; left:0; right:0;
+  flex-shrink:0;
   display:flex; align-items:center; justify-content:space-between;
-  padding:8px 14px 0; z-index:10; pointer-events:none;
+  padding:1.6vh 4vw 0;
 }
-.reader-topbar > * { pointer-events:all; }
 .reader-wpm, .reader-percent {
-  font-size:13px; font-weight:700; color:var(--text);
+  font-size:min(2.8vh,14px); font-weight:700; color:var(--text);
   letter-spacing:0.02em;
 }
 .reader-menu-btn {
-  background:none; border:none; cursor:pointer; padding:2px 6px;
-  color:var(--text); font-size:18px; line-height:1; opacity:0.7;
+  background:none; border:none; cursor:pointer; padding:0.4vh 1.4vw;
+  color:var(--text); font-size:min(4vh,20px); line-height:1; opacity:0.7;
 }
 
-/*
-  ── RSVP WORD STAGE ──
-  The core of RSVP: every word is positioned so that its
-  "pivot letter" (the ORP — Optimal Recognition Point) lands
-  at exactly the same pixel every time. We do this by:
-
-  1. The stage fills the full reader minus topbar + progress strip.
-  2. A single invisible "anchor" div sits at dead-center of the stage.
-  3. Each word is rendered as:
-       [before-text][pivot-letter][after-text]
-     in a flex row with baseline alignment.
-  4. We translate the whole word so the LEFT EDGE of the pivot-letter
-     span is at the anchor's X position. That means the pivot letter
-     is always at the same horizontal pixel regardless of word length.
-  5. Vertical: the stage uses flex centering, so the word baseline
-     sits at vertical center naturally. We also apply the user's
-     wordOffset as an additional translateY.
-*/
 .word-stage {
-  position:absolute;
-  left:0; right:0;
-  top:32px; bottom:20px;
-  /* DO NOT use flex centering here — we position manually */
+  flex:1;
+  min-height:0;
+  position:relative;
   overflow:hidden;
 }
 
-/* The anchor marks the exact center pixel of the stage */
-.pivot-anchor {
-  position:absolute;
-  left:50%; top:50%;
-  width:0; height:0;
-  /* The word row will be positioned relative to this */
-}
-
-/* Focus guide lines — vertical line through pivot, horizontal lines above/below */
+/* Focus guide: vertical line through the pivot + horizontal rules
+   above/below, all positioned with simple percentages relative to the
+   stage itself — always correct no matter how big the stage is. */
 .focus-guide {
   position:absolute;
   left:50%; top:0; bottom:0;
   width:0;
   pointer-events:none;
-  display:none; /* shown/hidden by JS */
+  display:none;
 }
-.focus-guide::before {
-  content:'';
-  position:absolute;
-  left:0; top:0;
-  width:1px;
-  height:calc(50% - 1.4em);
-  background:var(--text);
-  opacity:0.13;
-  transform:translateX(-50%);
+.focus-guide::before, .focus-guide::after {
+  content:''; position:absolute; left:0; width:1px;
+  background:var(--text); opacity:0.13; transform:translateX(-50%);
 }
-.focus-guide::after {
-  content:'';
-  position:absolute;
-  left:0; bottom:0;
-  width:1px;
-  height:calc(50% - 1.4em);
-  background:var(--text);
-  opacity:0.13;
-  transform:translateX(-50%);
-}
-/* Horizontal rule above word */
+.focus-guide::before { top:0; height:38%; }
+.focus-guide::after  { bottom:0; height:38%; }
 .focus-hline-top, .focus-hline-bot {
-  position:absolute;
-  left:0; right:0; height:1px;
-  background:var(--text); opacity:0.09;
-  pointer-events:none;
+  position:absolute; left:0; right:0; height:1px;
+  background:var(--text); opacity:0.09; pointer-events:none;
 }
-.focus-hline-top { top:calc(50% - 1.4em); }
-.focus-hline-bot { bottom:calc(50% - 1.4em); }
+.focus-hline-top { top:38%; }
+.focus-hline-bot { bottom:38%; }
 
 /*
-  The word row: absolute, positioned by JS so pivot aligns to center.
-  We use inline-flex so we can measure the before-span width.
+  The word row holds [before][pivot][after]. It's anchored with its
+  top-left at the stage's exact center (left:50%; top:50%), then JS
+  applies a translate() that shifts it left by exactly
+  (beforeTextWidth + pivotLetterWidth/2) and up by half its own
+  rendered height (adjusted by the user's vertical-offset setting).
+  That means the MIDDLE of the pivot letter — not its edge — always
+  lands on the exact center pixel of the stage, regardless of word
+  length, font size, or screen size.
 */
 .word-row {
   position:absolute;
+  left:50%; top:50%;
   display:inline-flex;
   align-items:center;
   white-space:nowrap;
   line-height:1;
   font-weight:800;
   letter-spacing:-0.02em;
-  /* top/left/transform set by JS */
+  will-change:transform;
 }
-
 .word-before { color:var(--text); }
 .word-pivot  { color:var(--accent); }
 .word-after  { color:var(--text); }
 
-/* Progress bar */
-.reader-bottom {
-  position:absolute; bottom:0; left:0; right:0;
-  padding:0 14px 7px; z-index:10;
-}
-.progress-track { height:2px; background:var(--border); border-radius:2px; overflow:hidden; }
+.reader-bottom { flex-shrink:0; padding:0 4vw 1.6vh; }
+.progress-track { height:0.4vh; background:var(--border); border-radius:2px; overflow:hidden; }
 .progress-fill  { height:100%; background:var(--accent); border-radius:2px; transition:width 0.12s linear; }
 
-/* Swipe hint */
 .swipe-hint {
-  position:absolute; right:7px; top:50%; transform:translateY(-50%);
-  font-size:8px; color:var(--text); opacity:0.18;
+  position:absolute; right:1.4vw; top:50%; transform:translateY(-50%);
+  font-size:min(1.6vh,8px); color:var(--text); opacity:0.18;
   writing-mode:vertical-rl; letter-spacing:0.12em;
   pointer-events:none; text-transform:uppercase; font-weight:700;
 }
 
-/* Pause overlay */
 .pause-overlay {
   position:absolute; inset:0; background:var(--bg); opacity:0.96;
   display:flex; flex-direction:column; align-items:center; justify-content:center;
-  gap:12px; z-index:20;
+  gap:2vh; z-index:20;
 }
 .pause-overlay.hidden { display:none; }
-.pause-label { font-size:10px; letter-spacing:0.2em; text-transform:uppercase; color:var(--muted); font-weight:700; }
-.pause-actions { display:flex; gap:10px; }
-.pause-bookname { font-size:11px; color:var(--muted); max-width:80%; text-align:center; }
+.pause-label { font-size:min(2vh,10px); letter-spacing:0.2em; text-transform:uppercase; color:var(--muted); font-weight:700; }
+.pause-actions { display:flex; gap:2vw; }
+.pause-bookname { font-size:min(2.4vh,11px); color:var(--muted); max-width:80%; text-align:center; }
 
-/* Reader menu */
 .reader-menu-overlay {
   position:absolute; inset:0; z-index:30; background:var(--bg);
-  display:flex; flex-direction:column; padding:12px 14px; gap:10px;
+  display:flex; flex-direction:column; padding:3vh 4vw; gap:1.8vh; overflow-y:auto;
 }
 .reader-menu-overlay.hidden { display:none; }
-.reader-menu-overlay h3 { font-size:14px; font-weight:700; }
-.reader-menu-grid { display:flex; gap:8px; flex-wrap:wrap; }
+.reader-menu-overlay h3 { font-size:min(3vh,15px); font-weight:700; }
+.reader-menu-grid { display:flex; gap:1.6vw; flex-wrap:wrap; }
 
-/* Import overlay */
 .import-overlay {
   position:absolute; inset:0; z-index:50; background:var(--bg);
   display:flex; flex-direction:column; align-items:center; justify-content:center;
-  gap:11px; padding:18px 22px;
+  gap:2vh; padding:4vh 6vw;
 }
 .import-overlay.hidden { display:none; }
 .import-header { width:100%; display:flex; align-items:center; justify-content:space-between; }
-.import-header-title { font-size:15px; font-weight:700; }
+.import-header-title { font-size:min(3.2vh,16px); font-weight:700; }
 .import-drop {
-  width:100%; border:1.5px dashed var(--border); border-radius:14px;
-  padding:16px; text-align:center; cursor:pointer;
+  width:100%; border:1.5px dashed var(--border); border-radius:2.6vh;
+  padding:3vh; text-align:center; cursor:pointer;
 }
-.import-drop-icon { font-size:24px; margin-bottom:5px; }
-.import-drop p { font-size:12px; color:var(--muted); line-height:1.5; }
+.import-drop-icon { font-size:min(4.8vh,24px); margin-bottom:1vh; }
+.import-drop p { font-size:min(2.4vh,12px); color:var(--muted); line-height:1.5; }
 #file-input { display:none; }
 .import-title-input {
   width:100%; background:var(--surface); border:1px solid var(--border);
-  border-radius:10px; padding:9px 12px; font-size:13px; color:var(--text);
+  border-radius:1.8vh; padding:1.6vh 3vw; font-size:min(2.8vh,13px); color:var(--text);
   outline:none; font-family:inherit;
 }
 .import-title-input::placeholder { color:var(--muted); }
-.import-actions { display:flex; gap:9px; width:100%; }
+.import-actions { display:flex; gap:1.8vw; width:100%; }
 .import-actions .btn { flex:1; }
 
-/* Toast */
 .toast {
-  position:absolute; bottom:16px; left:50%; transform:translateX(-50%);
+  position:absolute; bottom:3vh; left:50%; transform:translateX(-50%);
   background:var(--surface); border:1px solid var(--border);
-  color:var(--text); font-size:12px; font-weight:500;
-  padding:7px 16px; border-radius:20px; z-index:100;
+  color:var(--text); font-size:min(2.4vh,12px); font-weight:500;
+  padding:1.4vh 3.4vw; border-radius:4vh; z-index:100;
   white-space:nowrap; opacity:0; transition:opacity 0.3s; pointer-events:none;
 }
 .toast.show { opacity:1; }
 
-/* Finish */
-#finish { align-items:center; justify-content:center; gap:10px; padding:20px; text-align:center; }
-.finish-icon  { font-size:34px; }
-.finish-title { font-size:18px; font-weight:700; }
-.finish-sub   { font-size:12px; color:var(--muted); line-height:1.6; }
+#finish { align-items:center; justify-content:center; gap:1.6vh; padding:4vh; text-align:center; }
+.finish-icon  { font-size:min(6.8vh,34px); }
+.finish-title { font-size:min(3.6vh,18px); font-weight:700; }
+.finish-sub   { font-size:min(2.4vh,12px); color:var(--muted); line-height:1.6; }
 
 ::-webkit-scrollbar { display:none; }
 </style>
@@ -335,7 +296,7 @@ html, body {
     <button class="btn btn-secondary"  onclick="showScreen('library')">Library</button>
     <button class="btn btn-secondary"  onclick="showScreen('settings')">Settings</button>
   </div>
-  <div id="resume-row" style="display:none;margin-top:2px;">
+  <div id="resume-row" style="display:none;">
     <button class="btn btn-ghost" id="resume-btn" onclick="resumeReading()">▶ Continue reading</button>
   </div>
 </div>
@@ -344,10 +305,10 @@ html, body {
 <div id="library" class="screen">
   <div class="lib-header">
     <h2>Library</h2>
-    <button class="btn btn-secondary" style="font-size:11px;padding:6px 12px;" onclick="showImport()">+ Import</button>
+    <button class="btn btn-secondary" style="font-size:min(2.4vh,11px);padding:1.2vh 2.6vw;" onclick="showImport()">+ Import</button>
   </div>
   <div class="book-list" id="book-list"></div>
-  <div style="flex-shrink:0;padding-top:4px;">
+  <div style="flex-shrink:0;padding-top:0.8vh;">
     <button class="btn btn-ghost" onclick="showScreen('home')">← Back</button>
   </div>
 </div>
@@ -380,9 +341,9 @@ html, body {
     <div class="setting-row slider-row">
       <div class="setting-label" style="width:100%;display:flex;justify-content:space-between;align-items:center;">
         <span>Word Size</span>
-        <span class="val-label" id="fontsize-display">72px</span>
+        <span class="val-label" id="fontsize-display">18%</span>
       </div>
-      <input type="range" class="range-input" id="fontsize-slider" min="28" max="120" step="4" value="72">
+      <input type="range" class="range-input" id="fontsize-slider" min="8" max="32" step="1" value="18">
       <div class="slider-labels"><span>Small</span><span>Medium</span><span>Large</span></div>
     </div>
 
@@ -391,7 +352,7 @@ html, body {
         <span>Vertical Position</span>
         <span class="val-label" id="offset-display">Center</span>
       </div>
-      <input type="range" class="range-input" id="offset-slider" min="-120" max="120" step="5" value="0">
+      <input type="range" class="range-input" id="offset-slider" min="-15" max="15" step="1" value="0">
       <div class="slider-labels"><span>↑ Up</span><span>Center</span><span>↓ Down</span></div>
     </div>
 
@@ -426,19 +387,15 @@ html, body {
     <div class="reader-percent" id="reader-percent">0%</div>
   </div>
 
-  <div class="swipe-hint" id="swipe-hint">WPM ↕</div>
-
-  <!-- Word stage: pivot-based RSVP layout -->
   <div class="word-stage" id="word-stage">
-    <!-- Focus guide: vertical line through pivot -->
+    <div class="swipe-hint" id="swipe-hint">WPM ↕</div>
     <div class="focus-guide" id="focus-guide"></div>
     <div class="focus-hline-top" id="focus-hline-top" style="display:none;"></div>
     <div class="focus-hline-bot" id="focus-hline-bot" style="display:none;"></div>
 
-    <!-- Word row: positioned by JS so pivot aligns to exact center -->
     <div class="word-row" id="word-row">
       <span class="word-before" id="word-before"></span><span
-           class="word-pivot"  id="word-pivot">r</span><span
+           class="word-pivot"  id="word-pivot"></span><span
            class="word-after"  id="word-after"></span>
     </div>
   </div>
@@ -449,7 +406,6 @@ html, body {
     </div>
   </div>
 
-  <!-- Pause overlay -->
   <div class="pause-overlay hidden" id="pause-overlay">
     <div class="pause-label">Paused</div>
     <div class="pause-actions">
@@ -459,11 +415,10 @@ html, body {
     <div class="pause-bookname" id="pause-book-title"></div>
   </div>
 
-  <!-- Reader menu -->
   <div class="reader-menu-overlay hidden" id="reader-menu">
     <div style="display:flex;align-items:center;justify-content:space-between;">
       <h3 id="reader-menu-title">Reading</h3>
-      <button class="btn btn-ghost" style="padding:3px 7px;" onclick="backToReading()">✕</button>
+      <button class="btn btn-ghost" style="padding:0.6vh 1.4vw;" onclick="backToReading()">✕</button>
     </div>
     <div class="setting-group">
       <div class="setting-row slider-row">
@@ -491,7 +446,7 @@ html, body {
   <div class="finish-icon">📖</div>
   <div class="finish-title" id="finish-title">Finished!</div>
   <div class="finish-sub"   id="finish-sub">Great reading session.</div>
-  <div style="display:flex;gap:10px;margin-top:10px;">
+  <div style="display:flex;gap:2vw;margin-top:2vh;">
     <button class="btn btn-primary"   onclick="showScreen('library')">Library</button>
     <button class="btn btn-secondary" onclick="restartBook()">Read again</button>
   </div>
@@ -501,11 +456,11 @@ html, body {
 <div class="import-overlay hidden" id="import-overlay">
   <div class="import-header">
     <div class="import-header-title">Import Book</div>
-    <button class="btn btn-ghost" style="padding:3px 7px;" onclick="hideImport()">✕</button>
+    <button class="btn btn-ghost" style="padding:0.6vh 1.4vw;" onclick="hideImport()">✕</button>
   </div>
   <div class="import-drop" onclick="document.getElementById('file-input').click()">
     <div class="import-drop-icon">📄</div>
-    <p>Tap to select a file<br><span style="font-size:10px;">.pdf · .txt supported</span></p>
+    <p>Tap to select a file<br><span style="font-size:min(2vh,10px);">.pdf · .txt supported</span></p>
   </div>
   <input type="file" id="file-input" accept=".pdf,.txt" onchange="handleFileSelect(event)">
   <input type="text" class="import-title-input" id="import-title-input" placeholder="Book title (optional)">
@@ -513,10 +468,9 @@ html, body {
     <button class="btn btn-secondary" onclick="hideImport()">Cancel</button>
     <button class="btn btn-primary" id="import-confirm-btn" onclick="confirmImport()" disabled>Add to Library</button>
   </div>
-  <div id="import-status" style="font-size:11px;color:var(--muted);text-align:center;min-height:14px;"></div>
+  <div id="import-status" style="font-size:min(2.2vh,11px);color:var(--muted);text-align:center;min-height:2vh;"></div>
 </div>
 
-<!-- Toast -->
 <div class="toast" id="toast"></div>
 
 </div><!-- #app -->
@@ -524,33 +478,19 @@ html, body {
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script>
 // ─────────────────────────────────────────────
-//  SCALE — always renders as iPhone SE landscape 667×375
-// ─────────────────────────────────────────────
-const APP_W = 667, APP_H = 375;
-const appEl = document.getElementById('app');
-
-function rescale() {
-  // Fixed aspect ratio (667×375), never rotated — just scaled down to
-  // fit whatever space is available, letterboxed if needed. The phone's
-  // physical orientation or OS rotation lock has no effect on this.
-  const sw = window.innerWidth, sh = window.innerHeight;
-  const scale = Math.min(sw / APP_W, sh / APP_H);
-  appEl.style.transformOrigin = 'center center';
-  appEl.style.transform = `scale(${scale})`;
-}
-rescale();
-window.addEventListener('resize', rescale);
-window.addEventListener('orientationchange', () => setTimeout(rescale, 100));
-
-// ─────────────────────────────────────────────
 //  STATE
+//  fontSize and wordOffset are stored as vw/vh percentages, not raw
+//  pixels — that's what lets "Word Size" actually take up a real
+//  fraction of the screen on any device, and lets "Vertical Position"
+//  mean the same thing on any screen size.
 // ─────────────────────────────────────────────
-const STORAGE_KEY = 'readingrabbit_v2';
+const STORAGE_KEY = 'readingrabbit_v3';
 
 function defaultState() {
   return {
     theme:'dark', wpm:250, autopause:true, guide:true,
-    fontSize:72, wordOffset:0,
+    fontSize:18,      // vw units
+    wordOffset:0,     // vh units
     books:[], log:[], currentBookId:null, currentWordIndex:0,
   };
 }
@@ -577,6 +517,8 @@ function loadBooks() {
   } catch(e) {}
 }
 
+const appEl = document.getElementById('app');
+
 // ─────────────────────────────────────────────
 //  THEME
 // ─────────────────────────────────────────────
@@ -588,10 +530,9 @@ function applyTheme(t) {
 function setTheme(t) { state.theme = t; applyTheme(t); saveState(); }
 
 // ─────────────────────────────────────────────
-//  SCREENS — properly clears reader state on exit
+//  SCREENS
 // ─────────────────────────────────────────────
 function showScreen(name) {
-  // If leaving reader, stop playback and clear the word display
   const readerActive = document.getElementById('reader').classList.contains('active');
   if (readerActive && name !== 'reader') {
     stopPlayback();
@@ -616,7 +557,6 @@ function clearWordDisplay() {
   document.getElementById('word-before').textContent = '';
   document.getElementById('word-pivot').textContent  = '';
   document.getElementById('word-after').textContent  = '';
-  positionWordRow(0); // reset row position
 }
 
 // ─────────────────────────────────────────────
@@ -641,7 +581,7 @@ function renderSettings() {
   document.getElementById('wpm-slider').value      = state.wpm;
   document.getElementById('wpm-display').textContent = state.wpm + ' WPM';
   document.getElementById('fontsize-slider').value = state.fontSize;
-  document.getElementById('fontsize-display').textContent = state.fontSize + 'px';
+  document.getElementById('fontsize-display').textContent = state.fontSize + '%';
   document.getElementById('offset-slider').value   = state.wordOffset;
   document.getElementById('offset-display').textContent  = offsetLabel(state.wordOffset);
   document.getElementById('toggle-autopause').className  = 'toggle' + (state.autopause ? ' on':'');
@@ -652,7 +592,7 @@ function renderSettings() {
 
 function offsetLabel(v) {
   if (v === 0) return 'Center';
-  return v < 0 ? `${Math.abs(v)}px up` : `${v}px down`;
+  return v < 0 ? `${Math.abs(v)}% up` : `${v}% down`;
 }
 
 document.getElementById('wpm-slider').addEventListener('input', function() {
@@ -663,15 +603,14 @@ document.getElementById('wpm-slider').addEventListener('input', function() {
 
 document.getElementById('fontsize-slider').addEventListener('input', function() {
   state.fontSize = parseInt(this.value);
-  document.getElementById('fontsize-display').textContent = state.fontSize + 'px';
-  updateWordRowFont();
+  document.getElementById('fontsize-display').textContent = state.fontSize + '%';
+  if (lastWord !== null) layoutWord(lastWord);
   saveState();
 });
 
 document.getElementById('offset-slider').addEventListener('input', function() {
   state.wordOffset = parseInt(this.value);
   document.getElementById('offset-display').textContent = offsetLabel(state.wordOffset);
-  // Re-layout current word with new offset
   if (lastWord !== null) layoutWord(lastWord);
   saveState();
 });
@@ -681,7 +620,7 @@ function toggleSetting(key) { state[key] = !state[key]; renderSettings(); applyG
 function renderLog() {
   const el = document.getElementById('read-log');
   if (!state.log.length) {
-    el.innerHTML = '<div style="font-size:11px;color:var(--muted);">Finished books will appear here.</div>';
+    el.innerHTML = '<div style="font-size:min(2.2vh,11px);color:var(--muted);">Finished books will appear here.</div>';
     return;
   }
   el.innerHTML = state.log.slice().reverse().map(e => `
@@ -785,105 +724,84 @@ function deleteBook(id) {
 }
 
 // ─────────────────────────────────────────────
-//  RSVP ENGINE — Pivot-aligned word positioning
+//  RSVP ENGINE
+//  Every measurement here is taken from the LIVE DOM at the moment of
+//  layout — the stage's real getBoundingClientRect(), the real font
+//  size in px, the real width of the rendered "before" text and the
+//  real width of the pivot letter. Nothing is a hardcoded constant, so
+//  this is correct on any screen, in any orientation, at any zoom.
 // ─────────────────────────────────────────────
-/*
-  HOW PIVOT ALIGNMENT WORKS:
-  ─────────────────────────
-  The word stage is 667 × (375 - 32 - 20) = 667 × 323 px.
-  Dead center of stage = (333.5, 161.5).
-
-  For each word, we compute the "pivot index" — the letter
-  that sits at the optimal recognition point (ORP).
-
-  We render: <before><pivot><after> in a flex row.
-
-  To make the pivot letter always appear at screen center:
-    left = stageCenter.x - beforeTextWidth
-    top  = stageCenter.y + wordOffset - (fontSize * 0.75)
-          (0.75em ≈ cap height / baseline offset so the
-           letter visually sits centered, not its ascender)
-
-  We measure beforeTextWidth using an offscreen canvas
-  with the same font as the word row.
-*/
 
 let words = [], wordIndex = 0, wpm = 250;
 let timer = null, isPlaying = false, currentBookId = null;
 let swipeStartY = null, swipeStartWpm = null;
 let lastWord = null;
 
-// Offscreen canvas for text measurement
 const measureCanvas = document.createElement('canvas');
 const measureCtx = measureCanvas.getContext('2d');
 
-function getFontString(size) {
-  return `800 ${size}px -apple-system, 'SF Pro Display', 'Helvetica Neue', sans-serif`;
+function currentFontPx() {
+  // fontSize is stored as a vw percentage; convert to real px using the
+  // CURRENT viewport width every time this is called.
+  return (state.fontSize / 100) * window.innerWidth;
 }
 
-function measureText(text, fontSize) {
-  measureCtx.font = getFontString(fontSize);
+function getFontString(px) {
+  return `800 ${px}px -apple-system, 'SF Pro Display', 'Helvetica Neue', sans-serif`;
+}
+
+function measureText(text, px) {
+  measureCtx.font = getFontString(px);
   return measureCtx.measureText(text).width;
 }
 
-// Stage dimensions (fixed, matches CSS)
-const STAGE_TOP = 32, STAGE_BOTTOM = 20;
-const STAGE_W = APP_W;
-const STAGE_H = APP_H - STAGE_TOP - STAGE_BOTTOM; // 323
-
-function updateWordRowFont() {
-  const row = document.getElementById('word-row');
-  row.style.fontSize = state.fontSize + 'px';
-}
-
 /*
-  positionWordRow: centers the PIVOT LETTER ITSELF (not its left edge)
-  at the exact horizontal center of the stage, and centers the row
-  itself vertically at the stage's vertical center + wordOffset.
-
-  Approach: anchor the row's top-left at (50%, 50%) of the stage via
-  CSS, then use a transform to shift it left by exactly
-  (beforeWidth + pivotWidth/2) and up by half the row's own rendered
-  height (so the row — and therefore its visual middle — sits on the
-  vertical center line). This avoids any fragile cap-height guesswork:
-  whatever font metrics render, the pivot's horizontal midpoint and the
-  row's vertical midpoint always land on the stage's true center pixel.
+  positionWordRow: shifts the word row (anchored at the stage's exact
+  center via CSS left:50%/top:50%) so that:
+    - horizontally, the MIDDLE of the pivot letter sits on that center
+      line — shift left by (beforeWidth + pivotWidth/2)
+    - vertically, the row's own visual middle sits on that center line,
+      offset by the user's wordOffset (in vh, converted to px live)
 */
 function positionWordRow(beforeWidth, pivotWidth) {
   const row = document.getElementById('word-row');
   pivotWidth = pivotWidth || 0;
-  const rowH = row.offsetHeight || state.fontSize;
+  const rowH = row.offsetHeight || currentFontPx();
+  const offsetPx = (state.wordOffset / 100) * window.innerHeight;
   const shiftX = beforeWidth + pivotWidth / 2;
-  const shiftY = rowH / 2 - state.wordOffset;
-  row.style.left = '50%';
-  row.style.top  = '50%';
+  const shiftY = rowH / 2 - offsetPx;
   row.style.transform = `translate(${-shiftX}px, ${-shiftY}px)`;
 }
 
 function layoutWord(raw) {
   lastWord = raw;
-  const fs = state.fontSize;
+  const stage = document.getElementById('word-stage');
+  const stageW = stage.clientWidth || window.innerWidth;
 
-  // Compute pivot index
+  // Base font size from settings, converted to real px right now
+  let px = currentFontPx();
+
   const pivotIdx = getPivotIndex(raw);
-
-  // Split the word
   const before = raw.slice(0, pivotIdx);
   const pivot  = raw.slice(pivotIdx, pivotIdx + 1);
   const after  = raw.slice(pivotIdx + 1);
 
-  // Set content
+  // Auto-shrink if the full word would overflow the stage width
+  const fullW = measureText(raw, px);
+  const maxW = stageW * 0.92;
+  if (fullW > maxW && fullW > 0) {
+    px = Math.max(14, px * (maxW / fullW));
+  }
+
   document.getElementById('word-before').textContent = before;
   document.getElementById('word-pivot').textContent  = pivot;
   document.getElementById('word-after').textContent  = after;
 
-  // Measure before-text width to know how far left to shift, plus the
-  // pivot letter's own width so we can center IT, not just its edge
-  const beforeW = measureText(before, fs);
-  const pivotW  = measureText(pivot, fs);
+  const row = document.getElementById('word-row');
+  row.style.fontSize = px + 'px';
 
-  // Apply font size to row, then position
-  updateWordRowFont();
+  const beforeW = measureText(before, px);
+  const pivotW  = measureText(pivot, px);
   positionWordRow(beforeW, pivotW);
 }
 
@@ -961,22 +879,8 @@ function calcDelay(word) {
 
 function showWord(idx) {
   const raw = (words[idx] || '').trim();
-
-  // Auto-shrink font for very long words so they fit the stage width
-  const maxW = STAGE_W * 0.9;
-  let fs = state.fontSize;
-  const testW = measureText(raw, fs);
-  if (testW > maxW) {
-    fs = Math.max(18, Math.floor(fs * maxW / testW));
-  }
-
-  // Temporarily override fontSize just for this word's layout
-  const savedFs = state.fontSize;
-  state.fontSize = fs;
   layoutWord(raw);
-  state.fontSize = savedFs;
 
-  // Progress
   const pct = words.length > 1 ? (idx / (words.length - 1)) * 100 : 100;
   document.getElementById('progress-fill').style.width = pct + '%';
   document.getElementById('reader-percent').textContent = Math.round(pct) + '%';
@@ -984,23 +888,14 @@ function showWord(idx) {
 }
 
 /*
-  getPivotIndex — Optimal Recognition Point
-  Based on research: the eye fixates slightly left of center.
-  Letter index: 0-based into the word string.
-
+  getPivotIndex — Optimal Recognition Point (ORP).
   Word length → pivot (0-indexed letter):
-    1         → 0
-    2–3       → 1
-    4–5       → 1
-    6–9       → 2
-    10–13     → 3
-    14+       → 4
+    1 → 0, 2–5 → 1, 6–9 → 2, 10–13 → 3, 14+ → 4
 */
 function getPivotIndex(word) {
   const clean = word.replace(/[^a-zA-Z0-9]/g,'');
   const len = clean.length;
   if (len <= 1) return 0;
-  if (len <= 3) return 1;
   if (len <= 5) return 1;
   if (len <= 9) return 2;
   if (len <= 13) return 3;
@@ -1040,9 +935,8 @@ function showPause() { document.getElementById('pause-overlay').classList.remove
 function hidePause() { document.getElementById('pause-overlay').classList.add('hidden'); }
 
 function openReaderMenu() {
-  // Stop playback without surfacing the pause overlay — showing both the
-  // pause screen AND the menu on top of each other was the source of the
-  // cluttered, layered look when opening the menu.
+  // Stop playback silently — do NOT also show the pause overlay, or it
+  // stacks underneath the menu and clutters the screen.
   stopPlayback();
   state.currentWordIndex = wordIndex;
   saveState();
@@ -1113,6 +1007,14 @@ wordStage.addEventListener('touchend', () => {
   setTimeout(() => { document.getElementById('swipe-hint').style.opacity = '0.18'; }, 1200);
 });
 
+// Re-layout the current word whenever the viewport changes size or
+// orientation — since every measurement is taken live, this keeps the
+// pivot letter exactly centered no matter what the screen does.
+window.addEventListener('resize', () => { if (lastWord !== null) layoutWord(lastWord); });
+window.addEventListener('orientationchange', () => {
+  setTimeout(() => { if (lastWord !== null) layoutWord(lastWord); }, 100);
+});
+
 // ─────────────────────────────────────────────
 //  UTILS
 // ─────────────────────────────────────────────
@@ -1134,7 +1036,6 @@ function formatDate(iso) {
 // ─────────────────────────────────────────────
 loadBooks();
 applyTheme(state.theme);
-updateWordRowFont();
 renderHome();
 </script>
 </body>
