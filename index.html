@@ -1,0 +1,1132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Reading Rabbit</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+
+html, body {
+  width:100%; height:100%;
+  overflow:hidden;
+  background:#000;
+  display:flex; align-items:center; justify-content:center;
+}
+
+/*
+  #app is always the iPhone SE landscape viewport: 667×375.
+  JS scales it to fill whatever screen is available.
+*/
+#app {
+  position:relative;
+  width:667px;
+  height:375px;
+  overflow:hidden;
+  font-family: -apple-system, 'SF Pro Display', 'Helvetica Neue', sans-serif;
+  user-select:none;
+  touch-action:none;
+  background:var(--bg);
+  color:var(--text);
+  transition:background 0.3s, color 0.3s;
+}
+
+/* ── THEMES ── */
+#app {
+  --bg:#0a0a0a; --text:#f0f0f0; --accent:#e03030;
+  --muted:#888; --surface:#1c1c1c; --border:#2e2e2e;
+}
+#app.theme-nature {
+  --bg:#f5f0e8; --text:#1a1a1a; --accent:#c0392b;
+  --muted:#6b6460; --surface:#ede8df; --border:#d8d0c4;
+}
+
+/* ── SCREENS ── */
+.screen { position:absolute; inset:0; display:none; flex-direction:column; background:var(--bg); }
+.screen.active { display:flex; }
+
+/* ── SHARED COMPONENTS ── */
+.btn {
+  padding:10px 20px; border-radius:22px; font-size:13px; font-weight:600;
+  border:none; cursor:pointer; font-family:inherit;
+  transition:opacity 0.15s, transform 0.1s;
+}
+.btn:active { transform:scale(0.95); opacity:0.8; }
+.btn-primary  { background:var(--accent); color:#fff; }
+.btn-secondary{ background:var(--surface); color:var(--text); border:1px solid var(--border); }
+.btn-ghost    { background:transparent; color:var(--muted); font-size:12px; border:none; cursor:pointer; padding:8px 10px; font-family:inherit; }
+
+/* ── HOME ── */
+#home { align-items:center; justify-content:center; gap:14px; padding:20px; }
+.app-title {
+  font-size:42px; font-weight:800; letter-spacing:-1.5px; color:var(--text);
+  line-height:1;
+}
+.app-title .accent { color:var(--accent); }
+.home-actions { display:flex; gap:10px; flex-wrap:wrap; justify-content:center; margin-top:4px; }
+
+/* ── LIBRARY ── */
+#library { padding:12px 14px; gap:8px; }
+.lib-header { display:flex; align-items:center; justify-content:space-between; flex-shrink:0; }
+.lib-header h2 { font-size:16px; font-weight:700; }
+.book-list { display:flex; flex-direction:column; gap:7px; overflow-y:auto; flex:1; }
+.book-card {
+  background:var(--surface); border:1px solid var(--border); border-radius:11px;
+  padding:9px 12px; display:flex; align-items:center; justify-content:space-between;
+  cursor:pointer; flex-shrink:0;
+}
+.book-card:active { opacity:0.7; }
+.book-info { flex:1; min-width:0; }
+.book-title { font-size:13px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.book-meta  { font-size:11px; color:var(--muted); margin-top:1px; }
+.book-pbar  { height:2px; background:var(--border); border-radius:2px; margin-top:5px; overflow:hidden; }
+.book-pfill { height:100%; background:var(--accent); border-radius:2px; }
+.icon-btn   { background:none; border:none; cursor:pointer; padding:4px; color:var(--muted); font-size:15px; }
+.icon-btn:active { color:var(--accent); }
+.empty-lib  { text-align:center; color:var(--muted); font-size:12px; margin-top:20px; line-height:1.7; }
+
+/* ── SETTINGS ── */
+#settings { padding:12px 14px; gap:9px; overflow-y:auto; }
+.settings-header { display:flex; align-items:center; justify-content:space-between; flex-shrink:0; }
+.settings-header h2 { font-size:16px; font-weight:700; }
+.setting-group { background:var(--surface); border:1px solid var(--border); border-radius:11px; overflow:hidden; flex-shrink:0; }
+.setting-row {
+  display:flex; align-items:center; justify-content:space-between;
+  padding:10px 12px; border-bottom:1px solid var(--border);
+}
+.setting-row:last-child { border-bottom:none; }
+.setting-label { font-size:13px; }
+.setting-label small { display:block; font-size:10px; color:var(--muted); margin-top:1px; }
+.toggle {
+  width:42px; height:24px; background:var(--border); border-radius:12px;
+  position:relative; cursor:pointer; border:none; flex-shrink:0; transition:background 0.2s;
+}
+.toggle.on { background:var(--accent); }
+.toggle::after {
+  content:''; position:absolute; top:2px; left:2px;
+  width:20px; height:20px; background:#fff; border-radius:50%;
+  transition:transform 0.2s; box-shadow:0 1px 3px rgba(0,0,0,0.25);
+}
+.toggle.on::after { transform:translateX(18px); }
+.val-label { font-size:13px; font-weight:700; color:var(--accent); min-width:60px; text-align:right; }
+.range-input {
+  -webkit-appearance:none; appearance:none; width:100%; height:4px;
+  background:var(--border); border-radius:2px; outline:none; margin:7px 0 2px;
+}
+.range-input::-webkit-slider-thumb {
+  -webkit-appearance:none; width:20px; height:20px; border-radius:50%;
+  background:var(--accent); cursor:pointer; box-shadow:0 1px 4px rgba(0,0,0,0.3);
+}
+.slider-row { flex-direction:column; align-items:flex-start; }
+.slider-labels { display:flex; justify-content:space-between; width:100%; }
+.slider-labels span { font-size:10px; color:var(--muted); }
+.theme-picker { display:flex; gap:7px; }
+.theme-chip {
+  padding:5px 12px; border-radius:13px; font-size:11px; font-weight:600;
+  cursor:pointer; border:1.5px solid transparent;
+}
+.theme-chip.dark   { background:#1a1a1a; color:#f0f0f0; }
+.theme-chip.nature { background:#f5f0e8; color:#1a1a1a; border-color:#d8d0c4; }
+.theme-chip.selected { border-color:var(--accent); }
+.log-section { flex:1; overflow-y:auto; min-height:0; }
+.log-title { font-size:10px; font-weight:600; letter-spacing:0.1em; text-transform:uppercase; color:var(--muted); margin-bottom:7px; }
+.log-item { background:var(--surface); border:1px solid var(--border); border-radius:9px; padding:8px 11px; margin-bottom:5px; }
+.log-item-title { font-size:12px; font-weight:600; }
+.log-item-date  { font-size:10px; color:var(--muted); margin-top:1px; }
+
+/* ── READER ── */
+#reader { background:var(--bg); position:relative; }
+
+.reader-topbar {
+  position:absolute; top:0; left:0; right:0;
+  display:flex; align-items:center; justify-content:space-between;
+  padding:8px 14px 0; z-index:10; pointer-events:none;
+}
+.reader-topbar > * { pointer-events:all; }
+.reader-wpm, .reader-percent {
+  font-size:13px; font-weight:700; color:var(--text);
+  letter-spacing:0.02em;
+}
+.reader-menu-btn {
+  background:none; border:none; cursor:pointer; padding:2px 6px;
+  color:var(--text); font-size:18px; line-height:1; opacity:0.7;
+}
+
+/*
+  ── RSVP WORD STAGE ──
+  The core of RSVP: every word is positioned so that its
+  "pivot letter" (the ORP — Optimal Recognition Point) lands
+  at exactly the same pixel every time. We do this by:
+
+  1. The stage fills the full reader minus topbar + progress strip.
+  2. A single invisible "anchor" div sits at dead-center of the stage.
+  3. Each word is rendered as:
+       [before-text][pivot-letter][after-text]
+     in a flex row with baseline alignment.
+  4. We translate the whole word so the LEFT EDGE of the pivot-letter
+     span is at the anchor's X position. That means the pivot letter
+     is always at the same horizontal pixel regardless of word length.
+  5. Vertical: the stage uses flex centering, so the word baseline
+     sits at vertical center naturally. We also apply the user's
+     wordOffset as an additional translateY.
+*/
+.word-stage {
+  position:absolute;
+  left:0; right:0;
+  top:32px; bottom:20px;
+  /* DO NOT use flex centering here — we position manually */
+  overflow:hidden;
+}
+
+/* The anchor marks the exact center pixel of the stage */
+.pivot-anchor {
+  position:absolute;
+  left:50%; top:50%;
+  width:0; height:0;
+  /* The word row will be positioned relative to this */
+}
+
+/* Focus guide lines — vertical line through pivot, horizontal lines above/below */
+.focus-guide {
+  position:absolute;
+  left:50%; top:0; bottom:0;
+  width:0;
+  pointer-events:none;
+  display:none; /* shown/hidden by JS */
+}
+.focus-guide::before {
+  content:'';
+  position:absolute;
+  left:0; top:0;
+  width:1px;
+  height:calc(50% - 1.4em);
+  background:var(--text);
+  opacity:0.13;
+  transform:translateX(-50%);
+}
+.focus-guide::after {
+  content:'';
+  position:absolute;
+  left:0; bottom:0;
+  width:1px;
+  height:calc(50% - 1.4em);
+  background:var(--text);
+  opacity:0.13;
+  transform:translateX(-50%);
+}
+/* Horizontal rule above word */
+.focus-hline-top, .focus-hline-bot {
+  position:absolute;
+  left:0; right:0; height:1px;
+  background:var(--text); opacity:0.09;
+  pointer-events:none;
+}
+.focus-hline-top { top:calc(50% - 1.4em); }
+.focus-hline-bot { bottom:calc(50% - 1.4em); }
+
+/*
+  The word row: absolute, positioned by JS so pivot aligns to center.
+  We use inline-flex so we can measure the before-span width.
+*/
+.word-row {
+  position:absolute;
+  display:inline-flex;
+  align-items:baseline;
+  white-space:nowrap;
+  line-height:1;
+  font-weight:800;
+  letter-spacing:-0.02em;
+  /* top/left set by JS */
+}
+
+.word-before { color:var(--text); }
+.word-pivot  { color:var(--accent); }
+.word-after  { color:var(--text); }
+
+/* Progress bar */
+.reader-bottom {
+  position:absolute; bottom:0; left:0; right:0;
+  padding:0 14px 7px; z-index:10;
+}
+.progress-track { height:2px; background:var(--border); border-radius:2px; overflow:hidden; }
+.progress-fill  { height:100%; background:var(--accent); border-radius:2px; transition:width 0.12s linear; }
+
+/* Swipe hint */
+.swipe-hint {
+  position:absolute; right:7px; top:50%; transform:translateY(-50%);
+  font-size:8px; color:var(--text); opacity:0.18;
+  writing-mode:vertical-rl; letter-spacing:0.12em;
+  pointer-events:none; text-transform:uppercase; font-weight:700;
+}
+
+/* Pause overlay */
+.pause-overlay {
+  position:absolute; inset:0; background:var(--bg); opacity:0.96;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:12px; z-index:20;
+}
+.pause-overlay.hidden { display:none; }
+.pause-label { font-size:10px; letter-spacing:0.2em; text-transform:uppercase; color:var(--muted); font-weight:700; }
+.pause-actions { display:flex; gap:10px; }
+.pause-bookname { font-size:11px; color:var(--muted); max-width:80%; text-align:center; }
+
+/* Reader menu */
+.reader-menu-overlay {
+  position:absolute; inset:0; z-index:30; background:var(--bg);
+  display:flex; flex-direction:column; padding:12px 14px; gap:10px;
+}
+.reader-menu-overlay.hidden { display:none; }
+.reader-menu-overlay h3 { font-size:14px; font-weight:700; }
+.reader-menu-grid { display:flex; gap:8px; flex-wrap:wrap; }
+
+/* Import overlay */
+.import-overlay {
+  position:absolute; inset:0; z-index:50; background:var(--bg);
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:11px; padding:18px 22px;
+}
+.import-overlay.hidden { display:none; }
+.import-header { width:100%; display:flex; align-items:center; justify-content:space-between; }
+.import-header-title { font-size:15px; font-weight:700; }
+.import-drop {
+  width:100%; border:1.5px dashed var(--border); border-radius:14px;
+  padding:16px; text-align:center; cursor:pointer;
+}
+.import-drop-icon { font-size:24px; margin-bottom:5px; }
+.import-drop p { font-size:12px; color:var(--muted); line-height:1.5; }
+#file-input { display:none; }
+.import-title-input {
+  width:100%; background:var(--surface); border:1px solid var(--border);
+  border-radius:10px; padding:9px 12px; font-size:13px; color:var(--text);
+  outline:none; font-family:inherit;
+}
+.import-title-input::placeholder { color:var(--muted); }
+.import-actions { display:flex; gap:9px; width:100%; }
+.import-actions .btn { flex:1; }
+
+/* Toast */
+.toast {
+  position:absolute; bottom:16px; left:50%; transform:translateX(-50%);
+  background:var(--surface); border:1px solid var(--border);
+  color:var(--text); font-size:12px; font-weight:500;
+  padding:7px 16px; border-radius:20px; z-index:100;
+  white-space:nowrap; opacity:0; transition:opacity 0.3s; pointer-events:none;
+}
+.toast.show { opacity:1; }
+
+/* Finish */
+#finish { align-items:center; justify-content:center; gap:10px; padding:20px; text-align:center; }
+.finish-icon  { font-size:34px; }
+.finish-title { font-size:18px; font-weight:700; }
+.finish-sub   { font-size:12px; color:var(--muted); line-height:1.6; }
+
+::-webkit-scrollbar { display:none; }
+</style>
+</head>
+<body>
+
+<div id="app">
+
+<!-- HOME -->
+<div id="home" class="screen active">
+  <div class="app-title">Reading R<span class="accent">a</span>bbit.</div>
+  <div class="home-actions">
+    <button class="btn btn-primary"    onclick="showImport()">Import Book</button>
+    <button class="btn btn-secondary"  onclick="showScreen('library')">Library</button>
+    <button class="btn btn-secondary"  onclick="showScreen('settings')">Settings</button>
+  </div>
+  <div id="resume-row" style="display:none;margin-top:2px;">
+    <button class="btn btn-ghost" id="resume-btn" onclick="resumeReading()">▶ Continue reading</button>
+  </div>
+</div>
+
+<!-- LIBRARY -->
+<div id="library" class="screen">
+  <div class="lib-header">
+    <h2>Library</h2>
+    <button class="btn btn-secondary" style="font-size:11px;padding:6px 12px;" onclick="showImport()">+ Import</button>
+  </div>
+  <div class="book-list" id="book-list"></div>
+  <div style="flex-shrink:0;padding-top:4px;">
+    <button class="btn btn-ghost" onclick="showScreen('home')">← Back</button>
+  </div>
+</div>
+
+<!-- SETTINGS -->
+<div id="settings" class="screen">
+  <div class="settings-header">
+    <h2>Settings</h2>
+    <button class="btn btn-ghost" onclick="showScreen('home')">← Back</button>
+  </div>
+
+  <div class="setting-group">
+    <div class="setting-row">
+      <div class="setting-label">Theme</div>
+      <div class="theme-picker">
+        <div class="theme-chip dark selected" id="chip-dark"   onclick="setTheme('dark')">Dark</div>
+        <div class="theme-chip nature"        id="chip-nature" onclick="setTheme('nature')">Nature</div>
+      </div>
+    </div>
+
+    <div class="setting-row slider-row">
+      <div class="setting-label" style="width:100%;display:flex;justify-content:space-between;align-items:center;">
+        <span>Default Speed</span>
+        <span class="val-label" id="wpm-display">250 WPM</span>
+      </div>
+      <input type="range" class="range-input" id="wpm-slider" min="100" max="800" step="25" value="250">
+      <div class="slider-labels"><span>100</span><span>400</span><span>800</span></div>
+    </div>
+
+    <div class="setting-row slider-row">
+      <div class="setting-label" style="width:100%;display:flex;justify-content:space-between;align-items:center;">
+        <span>Word Size</span>
+        <span class="val-label" id="fontsize-display">72px</span>
+      </div>
+      <input type="range" class="range-input" id="fontsize-slider" min="28" max="120" step="4" value="72">
+      <div class="slider-labels"><span>Small</span><span>Medium</span><span>Large</span></div>
+    </div>
+
+    <div class="setting-row slider-row">
+      <div class="setting-label" style="width:100%;display:flex;justify-content:space-between;align-items:center;">
+        <span>Vertical Position</span>
+        <span class="val-label" id="offset-display">Center</span>
+      </div>
+      <input type="range" class="range-input" id="offset-slider" min="-120" max="120" step="5" value="0">
+      <div class="slider-labels"><span>↑ Up</span><span>Center</span><span>↓ Down</span></div>
+    </div>
+
+    <div class="setting-row">
+      <div class="setting-label">
+        Smart pacing
+        <small>Slows on long words &amp; punctuation</small>
+      </div>
+      <button class="toggle on" id="toggle-autopause" onclick="toggleSetting('autopause')"></button>
+    </div>
+
+    <div class="setting-row">
+      <div class="setting-label">
+        Focus guide
+        <small>Crosshair alignment lines</small>
+      </div>
+      <button class="toggle on" id="toggle-guide" onclick="toggleSetting('guide')"></button>
+    </div>
+  </div>
+
+  <div class="log-section">
+    <div class="log-title">Finished Books</div>
+    <div id="read-log"></div>
+  </div>
+</div>
+
+<!-- READER -->
+<div id="reader" class="screen">
+  <div class="reader-topbar">
+    <button class="reader-menu-btn" onclick="openReaderMenu()">⋮</button>
+    <div class="reader-wpm"     id="reader-wpm-label">250 WPM</div>
+    <div class="reader-percent" id="reader-percent">0%</div>
+  </div>
+
+  <div class="swipe-hint" id="swipe-hint">WPM ↕</div>
+
+  <!-- Word stage: pivot-based RSVP layout -->
+  <div class="word-stage" id="word-stage">
+    <!-- Focus guide: vertical line through pivot -->
+    <div class="focus-guide" id="focus-guide"></div>
+    <div class="focus-hline-top" id="focus-hline-top" style="display:none;"></div>
+    <div class="focus-hline-bot" id="focus-hline-bot" style="display:none;"></div>
+
+    <!-- Word row: positioned by JS so pivot aligns to exact center -->
+    <div class="word-row" id="word-row">
+      <span class="word-before" id="word-before"></span><span
+           class="word-pivot"  id="word-pivot">r</span><span
+           class="word-after"  id="word-after"></span>
+    </div>
+  </div>
+
+  <div class="reader-bottom">
+    <div class="progress-track">
+      <div class="progress-fill" id="progress-fill" style="width:0%"></div>
+    </div>
+  </div>
+
+  <!-- Pause overlay -->
+  <div class="pause-overlay hidden" id="pause-overlay">
+    <div class="pause-label">Paused</div>
+    <div class="pause-actions">
+      <button class="btn btn-primary"   onclick="play()">▶ Resume</button>
+      <button class="btn btn-secondary" onclick="exitToLibrary()">Library</button>
+    </div>
+    <div class="pause-bookname" id="pause-book-title"></div>
+  </div>
+
+  <!-- Reader menu -->
+  <div class="reader-menu-overlay hidden" id="reader-menu">
+    <div style="display:flex;align-items:center;justify-content:space-between;">
+      <h3 id="reader-menu-title">Reading</h3>
+      <button class="btn btn-ghost" style="padding:3px 7px;" onclick="closeReaderMenu()">✕</button>
+    </div>
+    <div class="setting-group">
+      <div class="setting-row slider-row">
+        <div class="setting-label" style="width:100%;display:flex;justify-content:space-between;">
+          <span>Speed</span>
+          <span class="val-label" id="reader-wpm-ctrl">250 WPM</span>
+        </div>
+        <input type="range" class="range-input" id="reader-wpm-slider" min="100" max="800" step="25" value="250">
+        <div class="slider-labels"><span>100</span><span>400</span><span>800</span></div>
+      </div>
+    </div>
+    <div class="reader-menu-grid">
+      <button class="btn btn-secondary" onclick="restartBook()">↺ Restart</button>
+      <button class="btn btn-secondary" onclick="markFinished()">✓ Mark Done</button>
+      <button class="btn btn-secondary" onclick="exitToLibrary()">Library</button>
+    </div>
+    <div style="margin-top:auto;">
+      <button class="btn btn-ghost" onclick="closeReaderMenu()">← Back to reading</button>
+    </div>
+  </div>
+</div>
+
+<!-- FINISH -->
+<div id="finish" class="screen">
+  <div class="finish-icon">📖</div>
+  <div class="finish-title" id="finish-title">Finished!</div>
+  <div class="finish-sub"   id="finish-sub">Great reading session.</div>
+  <div style="display:flex;gap:10px;margin-top:10px;">
+    <button class="btn btn-primary"   onclick="showScreen('library')">Library</button>
+    <button class="btn btn-secondary" onclick="restartBook()">Read again</button>
+  </div>
+</div>
+
+<!-- IMPORT -->
+<div class="import-overlay hidden" id="import-overlay">
+  <div class="import-header">
+    <div class="import-header-title">Import Book</div>
+    <button class="btn btn-ghost" style="padding:3px 7px;" onclick="hideImport()">✕</button>
+  </div>
+  <div class="import-drop" onclick="document.getElementById('file-input').click()">
+    <div class="import-drop-icon">📄</div>
+    <p>Tap to select a file<br><span style="font-size:10px;">.pdf · .txt supported</span></p>
+  </div>
+  <input type="file" id="file-input" accept=".pdf,.txt" onchange="handleFileSelect(event)">
+  <input type="text" class="import-title-input" id="import-title-input" placeholder="Book title (optional)">
+  <div class="import-actions">
+    <button class="btn btn-secondary" onclick="hideImport()">Cancel</button>
+    <button class="btn btn-primary" id="import-confirm-btn" onclick="confirmImport()" disabled>Add to Library</button>
+  </div>
+  <div id="import-status" style="font-size:11px;color:var(--muted);text-align:center;min-height:14px;"></div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+</div><!-- #app -->
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+// ─────────────────────────────────────────────
+//  SCALE — always renders as iPhone SE landscape 667×375
+// ─────────────────────────────────────────────
+const APP_W = 667, APP_H = 375;
+const appEl = document.getElementById('app');
+
+function rescale() {
+  const sw = window.innerWidth, sh = window.innerHeight;
+  const isPortrait = sh > sw;
+  // Long edge / short edge
+  const availW = isPortrait ? sh : sw;
+  const availH = isPortrait ? sw : sh;
+  const scale = Math.min(availW / APP_W, availH / APP_H);
+  const angle = isPortrait ? 90 : 0;
+  appEl.style.transformOrigin = 'center center';
+  appEl.style.transform = `rotate(${angle}deg) scale(${scale})`;
+}
+rescale();
+window.addEventListener('resize', rescale);
+window.addEventListener('orientationchange', () => setTimeout(rescale, 100));
+
+// ─────────────────────────────────────────────
+//  STATE
+// ─────────────────────────────────────────────
+const STORAGE_KEY = 'readingrabbit_v2';
+
+function defaultState() {
+  return {
+    theme:'dark', wpm:250, autopause:true, guide:true,
+    fontSize:72, wordOffset:0,
+    books:[], log:[], currentBookId:null, currentWordIndex:0,
+  };
+}
+
+let state = (() => {
+  try {
+    const s = localStorage.getItem(STORAGE_KEY);
+    if (s) return { ...defaultState(), ...JSON.parse(s) };
+  } catch(e) {}
+  return defaultState();
+})();
+
+function saveState() {
+  const slim = { ...state, books: state.books.map(b => ({ ...b, words: [] })) };
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(slim)); } catch(e) {}
+}
+function saveBooks() {
+  try { localStorage.setItem(STORAGE_KEY + '_books', JSON.stringify(state.books)); } catch(e) {}
+}
+function loadBooks() {
+  try {
+    const b = localStorage.getItem(STORAGE_KEY + '_books');
+    if (b) state.books = JSON.parse(b);
+  } catch(e) {}
+}
+
+// ─────────────────────────────────────────────
+//  THEME
+// ─────────────────────────────────────────────
+function applyTheme(t) {
+  appEl.classList.toggle('theme-nature', t === 'nature');
+  document.getElementById('chip-dark').classList.toggle('selected',   t === 'dark');
+  document.getElementById('chip-nature').classList.toggle('selected', t === 'nature');
+}
+function setTheme(t) { state.theme = t; applyTheme(t); saveState(); }
+
+// ─────────────────────────────────────────────
+//  SCREENS — properly clears reader state on exit
+// ─────────────────────────────────────────────
+function showScreen(name) {
+  // If leaving reader, stop playback and clear the word display
+  const readerActive = document.getElementById('reader').classList.contains('active');
+  if (readerActive && name !== 'reader') {
+    stopPlayback();
+    clearWordDisplay();
+  }
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(name).classList.add('active');
+  if (name === 'library')  renderLibrary();
+  if (name === 'settings') renderSettings();
+  if (name === 'home')     renderHome();
+}
+
+function exitToLibrary() {
+  stopPlayback();
+  clearWordDisplay();
+  hidePause();
+  closeReaderMenu();
+  showScreen('library');
+}
+
+function clearWordDisplay() {
+  document.getElementById('word-before').textContent = '';
+  document.getElementById('word-pivot').textContent  = '';
+  document.getElementById('word-after').textContent  = '';
+  positionWordRow(0); // reset row position
+}
+
+// ─────────────────────────────────────────────
+//  HOME
+// ─────────────────────────────────────────────
+function renderHome() {
+  const book = state.currentBookId ? state.books.find(b => b.id === state.currentBookId) : null;
+  const row  = document.getElementById('resume-row');
+  if (book && state.currentWordIndex > 0) {
+    row.style.display = 'block';
+    const pct = Math.round((state.currentWordIndex / book.words.length) * 100);
+    document.getElementById('resume-btn').textContent = `▶ ${book.title} — ${pct}%`;
+  } else {
+    row.style.display = 'none';
+  }
+}
+
+// ─────────────────────────────────────────────
+//  SETTINGS
+// ─────────────────────────────────────────────
+function renderSettings() {
+  document.getElementById('wpm-slider').value      = state.wpm;
+  document.getElementById('wpm-display').textContent = state.wpm + ' WPM';
+  document.getElementById('fontsize-slider').value = state.fontSize;
+  document.getElementById('fontsize-display').textContent = state.fontSize + 'px';
+  document.getElementById('offset-slider').value   = state.wordOffset;
+  document.getElementById('offset-display').textContent  = offsetLabel(state.wordOffset);
+  document.getElementById('toggle-autopause').className  = 'toggle' + (state.autopause ? ' on':'');
+  document.getElementById('toggle-guide').className      = 'toggle' + (state.guide    ? ' on':'');
+  applyTheme(state.theme);
+  renderLog();
+}
+
+function offsetLabel(v) {
+  if (v === 0) return 'Center';
+  return v < 0 ? `${Math.abs(v)}px up` : `${v}px down`;
+}
+
+document.getElementById('wpm-slider').addEventListener('input', function() {
+  state.wpm = parseInt(this.value);
+  document.getElementById('wpm-display').textContent = state.wpm + ' WPM';
+  saveState();
+});
+
+document.getElementById('fontsize-slider').addEventListener('input', function() {
+  state.fontSize = parseInt(this.value);
+  document.getElementById('fontsize-display').textContent = state.fontSize + 'px';
+  updateWordRowFont();
+  saveState();
+});
+
+document.getElementById('offset-slider').addEventListener('input', function() {
+  state.wordOffset = parseInt(this.value);
+  document.getElementById('offset-display').textContent = offsetLabel(state.wordOffset);
+  // Re-layout current word with new offset
+  if (lastWord !== null) layoutWord(lastWord);
+  saveState();
+});
+
+function toggleSetting(key) { state[key] = !state[key]; renderSettings(); applyGuide(); saveState(); }
+
+function renderLog() {
+  const el = document.getElementById('read-log');
+  if (!state.log.length) {
+    el.innerHTML = '<div style="font-size:11px;color:var(--muted);">Finished books will appear here.</div>';
+    return;
+  }
+  el.innerHTML = state.log.slice().reverse().map(e => `
+    <div class="log-item">
+      <div class="log-item-title">${esc(e.title)}</div>
+      <div class="log-item-date">Finished ${formatDate(e.finishedAt)}</div>
+    </div>`).join('');
+}
+
+// ─────────────────────────────────────────────
+//  IMPORT
+// ─────────────────────────────────────────────
+let pendingText = '', pendingFileName = '';
+
+function showImport() {
+  pendingText = ''; pendingFileName = '';
+  document.getElementById('import-title-input').value = '';
+  document.getElementById('import-confirm-btn').disabled = true;
+  document.getElementById('import-status').textContent  = '';
+  document.getElementById('file-input').value = '';
+  document.getElementById('import-overlay').classList.remove('hidden');
+}
+function hideImport() { document.getElementById('import-overlay').classList.add('hidden'); }
+
+async function handleFileSelect(e) {
+  const file = e.target.files[0]; if (!file) return;
+  const status = document.getElementById('import-status');
+  const btn    = document.getElementById('import-confirm-btn');
+  const titleEl= document.getElementById('import-title-input');
+  status.textContent = 'Processing…'; btn.disabled = true;
+  pendingFileName = file.name.replace(/\.[^.]+$/,'');
+  if (!titleEl.value) titleEl.value = pendingFileName;
+  try {
+    pendingText = file.name.endsWith('.pdf') ? await extractPDF(file) : await file.text();
+    const wc = pendingText.trim().split(/\s+/).filter(Boolean).length;
+    status.textContent = `${wc.toLocaleString()} words found`;
+    btn.disabled = false;
+  } catch(err) {
+    status.textContent = 'Could not read file — try a .txt file.';
+    console.error(err);
+  }
+}
+
+async function extractPDF(file) {
+  const lib = window['pdfjs-dist/build/pdf'];
+  lib.GlobalWorkerOptions.workerSrc =
+    'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  const pdf = await lib.getDocument({ data: await file.arrayBuffer() }).promise;
+  let text = '';
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const c = await page.getTextContent();
+    text += c.items.map(x => x.str).join(' ') + ' ';
+  }
+  return text;
+}
+
+function confirmImport() {
+  if (!pendingText) return;
+  const title = document.getElementById('import-title-input').value.trim() || pendingFileName || 'Untitled';
+  const words = pendingText.trim().split(/\s+/).filter(Boolean);
+  state.books.push({ id: Date.now().toString(), title, words, addedAt: new Date().toISOString() });
+  saveBooks(); saveState();
+  hideImport(); showToast(`"${title}" added`); showScreen('library');
+}
+
+// ─────────────────────────────────────────────
+//  LIBRARY
+// ─────────────────────────────────────────────
+function renderLibrary() {
+  const list = document.getElementById('book-list');
+  list.innerHTML = '';
+  if (!state.books.length) {
+    list.innerHTML = '<div class="empty-lib">No books yet.<br>Import a PDF or .txt file to begin.</div>';
+    return;
+  }
+  state.books.forEach(book => {
+    const prog = book.words.length > 0
+      ? Math.round(((state.currentBookId === book.id ? state.currentWordIndex : 0)
+                    / book.words.length) * 100) : 0;
+    const div = document.createElement('div');
+    div.className = 'book-card';
+    div.innerHTML = `
+      <div class="book-info">
+        <div class="book-title">${esc(book.title)}</div>
+        <div class="book-meta">${book.words.length.toLocaleString()} words · ${prog}% read</div>
+        <div class="book-pbar"><div class="book-pfill" style="width:${prog}%"></div></div>
+      </div>
+      <div class="book-actions">
+        <button class="icon-btn" onclick="event.stopPropagation();deleteBook('${book.id}')">🗑</button>
+      </div>`;
+    div.onclick = () => startBook(book.id);
+    list.appendChild(div);
+  });
+}
+
+function deleteBook(id) {
+  state.books = state.books.filter(b => b.id !== id);
+  if (state.currentBookId === id) { state.currentBookId = null; state.currentWordIndex = 0; }
+  saveBooks(); saveState(); renderLibrary();
+}
+
+// ─────────────────────────────────────────────
+//  RSVP ENGINE — Pivot-aligned word positioning
+// ─────────────────────────────────────────────
+/*
+  HOW PIVOT ALIGNMENT WORKS:
+  ─────────────────────────
+  The word stage is 667 × (375 - 32 - 20) = 667 × 323 px.
+  Dead center of stage = (333.5, 161.5).
+
+  For each word, we compute the "pivot index" — the letter
+  that sits at the optimal recognition point (ORP).
+
+  We render: <before><pivot><after> in a flex row.
+
+  To make the pivot letter always appear at screen center:
+    left = stageCenter.x - beforeTextWidth
+    top  = stageCenter.y + wordOffset - (fontSize * 0.75)
+          (0.75em ≈ cap height / baseline offset so the
+           letter visually sits centered, not its ascender)
+
+  We measure beforeTextWidth using an offscreen canvas
+  with the same font as the word row.
+*/
+
+let words = [], wordIndex = 0, wpm = 250;
+let timer = null, isPlaying = false, currentBookId = null;
+let swipeStartY = null, swipeStartWpm = null;
+let lastWord = null;
+
+// Offscreen canvas for text measurement
+const measureCanvas = document.createElement('canvas');
+const measureCtx = measureCanvas.getContext('2d');
+
+function getFontString(size) {
+  return `800 ${size}px -apple-system, 'SF Pro Display', 'Helvetica Neue', sans-serif`;
+}
+
+function measureText(text, fontSize) {
+  measureCtx.font = getFontString(fontSize);
+  return measureCtx.measureText(text).width;
+}
+
+// Stage dimensions (fixed, matches CSS)
+const STAGE_TOP = 32, STAGE_BOTTOM = 20;
+const STAGE_W = APP_W;
+const STAGE_H = APP_H - STAGE_TOP - STAGE_BOTTOM; // 323
+
+function updateWordRowFont() {
+  const row = document.getElementById('word-row');
+  row.style.fontSize = state.fontSize + 'px';
+}
+
+/*
+  positionWordRow: given the pivot index into the word string,
+  position the word row so the pivot letter's left edge sits
+  at horizontal center of the stage, and the word baseline
+  sits at vertical center + wordOffset.
+*/
+function positionWordRow(beforeWidth) {
+  const row = document.getElementById('word-row');
+  const stageX = STAGE_W / 2;          // horizontal center of stage
+  const stageY = STAGE_H / 2;          // vertical center of stage
+  const fs = state.fontSize;
+
+  // left: put pivot's left edge at stage center minus beforeWidth
+  const left = stageX - beforeWidth;
+
+  // top: position so the cap-height midpoint is at stageY + offset
+  // font cap height ≈ 0.72 × fontSize, so midpoint from top of glyph ≈ 0.36 × fontSize
+  // We want baseline - 0.36*fs = stageY + offset  →  top = stageY + offset - 0.64*fs
+  // (row is positioned by its top-left corner, baseline = top + fontSize roughly)
+  const capMid = fs * 0.36; // distance from top of letter to its visual midpoint
+  const top = stageY + state.wordOffset - capMid - (fs * 0.28);
+  // 0.28 extra offset upward because CSS top positions the text's ascender region
+
+  row.style.left = left + 'px';
+  row.style.top  = top  + 'px';
+}
+
+function layoutWord(raw) {
+  lastWord = raw;
+  const fs = state.fontSize;
+
+  // Compute pivot index
+  const pivotIdx = getPivotIndex(raw);
+
+  // Split the word
+  const before = raw.slice(0, pivotIdx);
+  const pivot  = raw.slice(pivotIdx, pivotIdx + 1);
+  const after  = raw.slice(pivotIdx + 1);
+
+  // Set content
+  document.getElementById('word-before').textContent = before;
+  document.getElementById('word-pivot').textContent  = pivot;
+  document.getElementById('word-after').textContent  = after;
+
+  // Measure before-text width to know how far left to shift
+  const beforeW = measureText(before, fs);
+
+  // Apply font size to row, then position
+  updateWordRowFont();
+  positionWordRow(beforeW);
+}
+
+function applyGuide() {
+  const show = state.guide;
+  document.getElementById('focus-guide').style.display     = show ? 'block' : 'none';
+  document.getElementById('focus-hline-top').style.display = show ? 'block' : 'none';
+  document.getElementById('focus-hline-bot').style.display = show ? 'block' : 'none';
+}
+
+function startBook(bookId, fromIndex) {
+  const book = state.books.find(b => b.id === bookId);
+  if (!book || !book.words.length) { showToast('Empty book'); return; }
+  currentBookId = bookId;
+  state.currentBookId = bookId;
+  words = book.words;
+  wordIndex = fromIndex !== null && fromIndex !== undefined ? fromIndex
+    : (state.currentBookId === bookId && state.currentWordIndex > 0 ? state.currentWordIndex : 0);
+  wordIndex = Math.max(0, Math.min(wordIndex, words.length - 1));
+  wpm = state.wpm;
+  updateReaderWpmSlider();
+  applyGuide();
+  document.getElementById('pause-book-title').textContent = book.title;
+  clearWordDisplay();
+  showScreen('reader');
+  hidePause(); closeReaderMenu();
+  play(); saveState();
+}
+
+function resumeReading() {
+  if (!state.currentBookId) { showScreen('library'); return; }
+  startBook(state.currentBookId, state.currentWordIndex);
+}
+
+function stopPlayback() {
+  isPlaying = false;
+  if (timer) { clearTimeout(timer); timer = null; }
+}
+
+function play() {
+  stopPlayback();
+  isPlaying = true;
+  hidePause();
+  scheduleNext();
+}
+
+function pause() {
+  stopPlayback();
+  showPause();
+  state.currentWordIndex = wordIndex;
+  saveState();
+}
+
+function scheduleNext() {
+  if (!isPlaying) return;
+  showWord(wordIndex);
+  const delay = calcDelay(words[wordIndex] || '');
+  wordIndex++;
+  if (wordIndex >= words.length) {
+    timer = setTimeout(finishBook, delay);
+    return;
+  }
+  timer = setTimeout(scheduleNext, delay);
+}
+
+function calcDelay(word) {
+  const base = 60000 / wpm;
+  if (!state.autopause) return base;
+  let m = 1;
+  const len = word.replace(/[^a-z]/gi,'').length;
+  if (len >= 11) m = 1.8; else if (len >= 8) m = 1.4;
+  if (/[.!?]$/.test(word)) m *= 1.5; else if (/[,;:]$/.test(word)) m *= 1.2;
+  return base * m;
+}
+
+function showWord(idx) {
+  const raw = (words[idx] || '').trim();
+
+  // Auto-shrink font for very long words so they fit the stage width
+  const maxW = STAGE_W * 0.9;
+  let fs = state.fontSize;
+  const testW = measureText(raw, fs);
+  if (testW > maxW) {
+    fs = Math.max(18, Math.floor(fs * maxW / testW));
+  }
+
+  // Temporarily override fontSize just for this word's layout
+  const savedFs = state.fontSize;
+  state.fontSize = fs;
+  layoutWord(raw);
+  state.fontSize = savedFs;
+
+  // Progress
+  const pct = words.length > 1 ? (idx / (words.length - 1)) * 100 : 100;
+  document.getElementById('progress-fill').style.width = pct + '%';
+  document.getElementById('reader-percent').textContent = Math.round(pct) + '%';
+  document.getElementById('reader-wpm-label').textContent = wpm + ' WPM';
+}
+
+/*
+  getPivotIndex — Optimal Recognition Point
+  Based on research: the eye fixates slightly left of center.
+  Letter index: 0-based into the word string.
+
+  Word length → pivot (0-indexed letter):
+    1         → 0
+    2–3       → 1
+    4–5       → 1
+    6–9       → 2
+    10–13     → 3
+    14+       → 4
+*/
+function getPivotIndex(word) {
+  const clean = word.replace(/[^a-zA-Z0-9]/g,'');
+  const len = clean.length;
+  if (len <= 1) return 0;
+  if (len <= 3) return 1;
+  if (len <= 5) return 1;
+  if (len <= 9) return 2;
+  if (len <= 13) return 3;
+  return 4;
+}
+
+function finishBook() {
+  isPlaying = false;
+  const book = state.books.find(b => b.id === currentBookId);
+  if (book) {
+    if (!state.log.find(l => l.id === book.id)) {
+      state.log.push({ id: book.id, title: book.title, finishedAt: new Date().toISOString() });
+    }
+    state.currentWordIndex = 0; saveState();
+    document.getElementById('finish-title').textContent = `Finished "${book.title}"`;
+    document.getElementById('finish-sub').textContent   = `${book.words.length.toLocaleString()} words · Added to your log.`;
+  }
+  clearWordDisplay();
+  showScreen('finish');
+}
+
+function restartBook() {
+  if (currentBookId) startBook(currentBookId, 0);
+}
+
+function markFinished() {
+  const book = state.books.find(b => b.id === currentBookId);
+  if (book) {
+    state.log.push({ id: book.id, title: book.title, finishedAt: new Date().toISOString() });
+    state.currentWordIndex = 0; saveState();
+    showToast('Marked as finished');
+    exitToLibrary();
+  }
+}
+
+function showPause() { document.getElementById('pause-overlay').classList.remove('hidden'); }
+function hidePause() { document.getElementById('pause-overlay').classList.add('hidden'); }
+
+function openReaderMenu() {
+  pause();
+  const book = state.books.find(b => b.id === currentBookId);
+  document.getElementById('reader-menu-title').textContent = book ? book.title : 'Reading';
+  document.getElementById('reader-menu').classList.remove('hidden');
+}
+function closeReaderMenu() { document.getElementById('reader-menu').classList.add('hidden'); }
+
+function updateReaderWpmSlider() {
+  document.getElementById('reader-wpm-slider').value = wpm;
+  document.getElementById('reader-wpm-ctrl').textContent  = wpm + ' WPM';
+  document.getElementById('reader-wpm-label').textContent = wpm + ' WPM';
+}
+
+document.getElementById('reader-wpm-slider').addEventListener('input', function() {
+  wpm = parseInt(this.value); state.wpm = wpm;
+  document.getElementById('reader-wpm-ctrl').textContent  = wpm + ' WPM';
+  document.getElementById('reader-wpm-label').textContent = wpm + ' WPM';
+  saveState();
+});
+
+// ─────────────────────────────────────────────
+//  TOUCH CONTROLS
+// ─────────────────────────────────────────────
+const wordStage = document.getElementById('word-stage');
+
+wordStage.addEventListener('click', e => {
+  const rect = wordStage.getBoundingClientRect();
+  const relX = e.clientX - rect.left;
+  const w    = rect.width;
+  if (relX < w * 0.22) {
+    wordIndex = Math.max(0, wordIndex - 12);
+    if (!isPlaying) showWord(wordIndex);
+  } else if (relX > w * 0.78) {
+    wordIndex = Math.min(words.length - 1, wordIndex + 10);
+    if (!isPlaying) showWord(wordIndex);
+  } else {
+    if (isPlaying) pause(); else play();
+  }
+});
+
+wordStage.addEventListener('touchstart', e => {
+  swipeStartY = e.touches[0].clientY; swipeStartWpm = wpm;
+}, { passive: true });
+
+wordStage.addEventListener('touchmove', e => {
+  if (swipeStartY === null) return;
+  const dy = swipeStartY - e.touches[0].clientY;
+  const newWpm = Math.max(100, Math.min(800, swipeStartWpm + Math.round(dy / 2)));
+  if (newWpm !== wpm) {
+    wpm = newWpm; state.wpm = wpm;
+    updateReaderWpmSlider();
+    document.getElementById('swipe-hint').style.opacity = '0.7';
+    saveState();
+  }
+}, { passive: true });
+
+wordStage.addEventListener('touchend', () => {
+  swipeStartY = null;
+  setTimeout(() => { document.getElementById('swipe-hint').style.opacity = '0.18'; }, 1200);
+});
+
+// ─────────────────────────────────────────────
+//  UTILS
+// ─────────────────────────────────────────────
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2200);
+}
+function esc(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function formatDate(iso) {
+  try { return new Date(iso).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}); }
+  catch(e) { return ''; }
+}
+
+// ─────────────────────────────────────────────
+//  INIT
+// ─────────────────────────────────────────────
+loadBooks();
+applyTheme(state.theme);
+updateWordRowFont();
+renderHome();
+</script>
+</body>
+</html>
