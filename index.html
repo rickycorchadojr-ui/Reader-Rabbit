@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Reading Rabbit</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
 <style>
 * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
 
@@ -88,6 +90,12 @@ html, body {
 .book-pfill { height:100%; background:var(--accent); border-radius:2px; }
 .icon-btn   { background:none; border:none; cursor:pointer; padding:1vh; color:var(--muted); font-size:min(3vh,15px); }
 .icon-btn:active { color:var(--accent); }
+.book-finished {
+  border-color:#d4af37;
+  background:linear-gradient(135deg, color-mix(in srgb, #d4af37 14%, var(--surface)), var(--surface));
+}
+.book-finished .book-title { color:#d4af37; }
+.book-finished .book-pfill { background:#d4af37; }
 .empty-lib  { text-align:center; color:var(--muted); font-size:min(2.6vh,12px); margin-top:4vh; line-height:1.7; }
 
 /* ── SETTINGS ── */
@@ -154,10 +162,21 @@ html, body {
   font-size:min(2.8vh,14px); font-weight:700; color:var(--text);
   letter-spacing:0.02em;
 }
-.reader-menu-btn {
-  background:none; border:none; cursor:pointer; padding:0.4vh 1.4vw;
-  color:var(--text); font-size:min(4vh,20px); line-height:1; opacity:0.7;
+.digital-readout {
+  font-family:'VT323', monospace;
+  color:var(--accent);
+  font-size:min(4.2vh,22px);
+  letter-spacing:0.04em;
+  text-shadow:0 0 6px color-mix(in srgb, var(--accent) 55%, transparent);
 }
+.reader-menu-btn {
+  background:none; border:none; cursor:pointer;
+  width:max(11vw,44px); height:max(11vw,44px);
+  display:flex; align-items:center; justify-content:center;
+  color:var(--text); font-size:min(4vh,20px); line-height:1; opacity:0.75;
+  margin-left:-2.4vw; /* visual icon stays put; the hitbox grows around it */
+}
+.reader-menu-btn:active { opacity:1; }
 
 .word-stage {
   flex:1;
@@ -166,28 +185,20 @@ html, body {
   overflow:hidden;
 }
 
-/* Focus guide: vertical line through the pivot + horizontal rules
-   above/below, all positioned with simple percentages relative to the
-   stage itself — always correct no matter how big the stage is. */
-.focus-guide {
-  position:absolute;
-  left:50%; top:0; bottom:0;
-  width:0;
-  pointer-events:none;
-  display:none;
-}
-.focus-guide::before, .focus-guide::after {
-  content:''; position:absolute; left:0; width:1px;
-  background:var(--text); opacity:0.13; transform:translateX(-50%);
-}
-.focus-guide::before { top:0; height:38%; }
-.focus-guide::after  { bottom:0; height:38%; }
+/* Focus guide: a subtle horizontal line above and below the word,
+   connected by a short vertical tick that spans only the gap between
+   them (not the full stage height) — a gentle "I-beam" crosshair
+   rather than a heavy full-length line. Position/height set live by
+   JS to track the word's actual center + vertical offset. */
 .focus-hline-top, .focus-hline-bot {
-  position:absolute; left:0; right:0; height:1px;
-  background:var(--text); opacity:0.09; pointer-events:none;
+  position:absolute; left:10%; right:10%; height:1px;
+  background:var(--muted); opacity:0.3; pointer-events:none;
 }
-.focus-hline-top { top:38%; }
-.focus-hline-bot { bottom:38%; }
+.focus-tick {
+  position:absolute; left:50%; width:1px;
+  background:var(--muted); opacity:0.3;
+  transform:translateX(-50%); pointer-events:none;
+}
 
 /*
   The word row holds [before][pivot][after]. It's anchored with its
@@ -214,9 +225,26 @@ html, body {
 .word-pivot  { color:var(--accent); }
 .word-after  { color:var(--text); }
 
-.reader-bottom { flex-shrink:0; padding:0 4vw 1.6vh; }
-.progress-track { height:0.4vh; background:var(--border); border-radius:2px; overflow:hidden; }
+.reader-bottom { flex-shrink:0; padding:0 4vw 1vh; }
+.scrub-wrap { position:relative; height:5vh; display:flex; align-items:center; }
+.progress-track {
+  position:absolute; left:0; right:0; height:0.5vh;
+  background:var(--border); border-radius:2px; overflow:hidden; pointer-events:none;
+}
 .progress-fill  { height:100%; background:var(--accent); border-radius:2px; transition:width 0.12s linear; }
+.scrub-thumb {
+  position:absolute; top:50%; width:1.6vh; height:1.6vh; max-width:14px; max-height:14px;
+  background:var(--accent); border-radius:50%; transform:translate(-50%,-50%);
+  pointer-events:none; box-shadow:0 0 0 4px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+.scrub-input {
+  position:absolute; inset:0; width:100%; height:100%; margin:0;
+  -webkit-appearance:none; appearance:none; background:transparent; opacity:0; cursor:pointer;
+}
+.scrub-input::-webkit-slider-thumb { -webkit-appearance:none; width:5vh; height:5vh; background:transparent; }
+.scrub-input::-webkit-slider-runnable-track { background:transparent; }
+.scrub-input::-moz-range-thumb { width:5vh; height:5vh; background:transparent; border:none; }
+.scrub-input::-moz-range-track { background:transparent; }
 
 .swipe-hint {
   position:absolute; right:1.4vw; top:50%; transform:translateY(-50%);
@@ -332,7 +360,7 @@ html, body {
     <div class="setting-row slider-row">
       <div class="setting-label" style="width:100%;display:flex;justify-content:space-between;align-items:center;">
         <span>Default Speed</span>
-        <span class="val-label" id="wpm-display">250 WPM</span>
+        <span class="val-label digital-readout" id="wpm-display">250 WPM</span>
       </div>
       <input type="range" class="range-input" id="wpm-slider" min="100" max="800" step="25" value="250">
       <div class="slider-labels"><span>100</span><span>400</span><span>800</span></div>
@@ -383,13 +411,13 @@ html, body {
 <div id="reader" class="screen">
   <div class="reader-topbar">
     <button class="reader-menu-btn" onclick="openReaderMenu()">⋮</button>
-    <div class="reader-wpm"     id="reader-wpm-label">250 WPM</div>
+    <div class="reader-wpm digital-readout" id="reader-wpm-label">250 WPM</div>
     <div class="reader-percent" id="reader-percent">0%</div>
   </div>
 
   <div class="word-stage" id="word-stage">
     <div class="swipe-hint" id="swipe-hint">WPM ↕</div>
-    <div class="focus-guide" id="focus-guide"></div>
+    <div class="focus-tick" id="focus-tick" style="display:none;"></div>
     <div class="focus-hline-top" id="focus-hline-top" style="display:none;"></div>
     <div class="focus-hline-bot" id="focus-hline-bot" style="display:none;"></div>
 
@@ -401,8 +429,12 @@ html, body {
   </div>
 
   <div class="reader-bottom">
-    <div class="progress-track">
-      <div class="progress-fill" id="progress-fill" style="width:0%"></div>
+    <div class="scrub-wrap">
+      <div class="progress-track">
+        <div class="progress-fill" id="progress-fill" style="width:0%"></div>
+      </div>
+      <div class="scrub-thumb" id="scrub-thumb" style="left:0%"></div>
+      <input type="range" class="scrub-input" id="scrub-input" min="0" max="0" step="1" value="0">
     </div>
   </div>
 
@@ -424,7 +456,7 @@ html, body {
       <div class="setting-row slider-row">
         <div class="setting-label" style="width:100%;display:flex;justify-content:space-between;">
           <span>Speed</span>
-          <span class="val-label" id="reader-wpm-ctrl">250 WPM</span>
+          <span class="val-label digital-readout" id="reader-wpm-ctrl">250 WPM</span>
         </div>
         <input type="range" class="range-input" id="reader-wpm-slider" min="100" max="800" step="25" value="250">
         <div class="slider-labels"><span>100</span><span>400</span><span>800</span></div>
@@ -698,16 +730,17 @@ function renderLibrary() {
     return;
   }
   state.books.forEach(book => {
+    const finished = state.log.some(l => l.id === book.id);
     const prog = book.words.length > 0
       ? Math.round(((state.currentBookId === book.id ? state.currentWordIndex : 0)
                     / book.words.length) * 100) : 0;
     const div = document.createElement('div');
-    div.className = 'book-card';
+    div.className = 'book-card' + (finished ? ' book-finished' : '');
     div.innerHTML = `
       <div class="book-info">
-        <div class="book-title">${esc(book.title)}</div>
-        <div class="book-meta">${book.words.length.toLocaleString()} words · ${prog}% read</div>
-        <div class="book-pbar"><div class="book-pfill" style="width:${prog}%"></div></div>
+        <div class="book-title">${esc(book.title)}${finished ? ' 🏆' : ''}</div>
+        <div class="book-meta">${book.words.length.toLocaleString()} words · ${finished ? 'Finished' : prog + '% read'}</div>
+        <div class="book-pbar"><div class="book-pfill" style="width:${finished ? 100 : prog}%"></div></div>
       </div>
       <div class="book-actions">
         <button class="icon-btn" onclick="event.stopPropagation();deleteBook('${book.id}')">🗑</button>
@@ -735,6 +768,7 @@ function deleteBook(id) {
 let words = [], wordIndex = 0, wpm = 250;
 let timer = null, isPlaying = false, currentBookId = null;
 let swipeStartY = null, swipeStartWpm = null;
+let scrubbing = false, wasPlayingBeforeScrub = false;
 let lastWord = null;
 
 const measureCanvas = document.createElement('canvas');
@@ -803,13 +837,34 @@ function layoutWord(raw) {
   const beforeW = measureText(before, px);
   const pivotW  = measureText(pivot, px);
   positionWordRow(beforeW, pivotW);
+  positionFocusGuide(row.offsetHeight || px);
 }
 
 function applyGuide() {
   const show = state.guide;
-  document.getElementById('focus-guide').style.display     = show ? 'block' : 'none';
+  document.getElementById('focus-tick').style.display      = show ? 'block' : 'none';
   document.getElementById('focus-hline-top').style.display = show ? 'block' : 'none';
   document.getElementById('focus-hline-bot').style.display = show ? 'block' : 'none';
+}
+
+// Positions the (optional) focus guide lines around the word's actual
+// current center, computed from the same live measurements used to
+// place the word itself — so the guide always frames the word exactly,
+// regardless of font size, vertical offset, or screen size.
+function positionFocusGuide(rowH) {
+  if (!state.guide) return;
+  const stage = document.getElementById('word-stage');
+  const sH = stage.clientHeight;
+  const offsetPx = (state.wordOffset / 100) * window.innerHeight;
+  const wordCenterY = sH / 2 + offsetPx;
+  const gap = rowH / 2 + rowH * 0.22; // small breathing room around the word
+  const top = document.getElementById('focus-hline-top');
+  const bot = document.getElementById('focus-hline-bot');
+  const tick = document.getElementById('focus-tick');
+  top.style.top = (wordCenterY - gap) + 'px';
+  bot.style.top = (wordCenterY + gap) + 'px';
+  tick.style.top = (wordCenterY - gap) + 'px';
+  tick.style.height = (gap * 2) + 'px';
 }
 
 function startBook(bookId, fromIndex) {
@@ -825,6 +880,7 @@ function startBook(bookId, fromIndex) {
   updateReaderWpmSlider();
   applyGuide();
   document.getElementById('pause-book-title').textContent = book.title;
+  document.getElementById('scrub-input').max = words.length - 1;
   clearWordDisplay();
   showScreen('reader');
   hidePause(); closeReaderMenu();
@@ -883,8 +939,11 @@ function showWord(idx) {
 
   const pct = words.length > 1 ? (idx / (words.length - 1)) * 100 : 100;
   document.getElementById('progress-fill').style.width = pct + '%';
+  document.getElementById('scrub-thumb').style.left = pct + '%';
   document.getElementById('reader-percent').textContent = Math.round(pct) + '%';
   document.getElementById('reader-wpm-label').textContent = wpm + ' WPM';
+  const scrub = document.getElementById('scrub-input');
+  if (!scrubbing) scrub.value = idx;
 }
 
 /*
@@ -969,6 +1028,36 @@ document.getElementById('reader-wpm-slider').addEventListener('input', function(
 // ─────────────────────────────────────────────
 //  TOUCH CONTROLS
 // ─────────────────────────────────────────────
+// ─────────────────────────────────────────────
+//  SCRUBBER — drag anywhere on the bottom bar to jump through the book
+// ─────────────────────────────────────────────
+const scrubInput = document.getElementById('scrub-input');
+
+function beginScrub() {
+  if (scrubbing) return;
+  scrubbing = true;
+  wasPlayingBeforeScrub = isPlaying;
+  stopPlayback();
+  hidePause();
+}
+function endScrub() {
+  scrubbing = false;
+  if (wasPlayingBeforeScrub) play(); else showWord(wordIndex);
+}
+
+scrubInput.addEventListener('pointerdown', beginScrub);
+scrubInput.addEventListener('touchstart', beginScrub, { passive:true });
+
+scrubInput.addEventListener('input', function() {
+  wordIndex = parseInt(this.value);
+  state.currentWordIndex = wordIndex;
+  showWord(wordIndex);
+});
+
+scrubInput.addEventListener('pointerup', endScrub);
+scrubInput.addEventListener('touchend', endScrub);
+scrubInput.addEventListener('change', () => { if (scrubbing) endScrub(); });
+
 const wordStage = document.getElementById('word-stage');
 
 wordStage.addEventListener('click', e => {
