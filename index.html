@@ -1,0 +1,935 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Reader</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  :root {
+    --bg: #0a0a0a;
+    --text: #f0f0f0;
+    --accent: #e03030;
+    --muted: #888;
+    --surface: #1c1c1c;
+    --border: #2e2e2e;
+  }
+
+  .theme-nature {
+    --bg: #f5f0e8;
+    --text: #1a1a1a;
+    --accent: #c0392b;
+    --muted: #6b6460;
+    --surface: #ede8df;
+    --border: #d8d0c4;
+  }
+
+  /* ── FORCE LANDSCAPE ── */
+  /* The wrapper is always rotated so portrait phones appear landscape */
+  html, body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: #000;
+  }
+
+  #app {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, 'SF Pro Display', 'Helvetica Neue', sans-serif;
+    transition: background 0.3s, color 0.3s;
+    touch-action: none;
+    user-select: none;
+    /* Always fill as if landscape */
+    position: fixed;
+    overflow: hidden;
+  }
+
+  /* Portrait mode: rotate the entire app 90deg so it appears landscape */
+  @media (orientation: portrait) {
+    #app {
+      width: 100vh;
+      height: 100vw;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) rotate(90deg);
+      transform-origin: center center;
+    }
+  }
+
+  /* Landscape mode: fill normally */
+  @media (orientation: landscape) {
+    #app {
+      width: 100vw;
+      height: 100vh;
+      top: 0;
+      left: 0;
+    }
+  }
+
+  /* ── SCREENS ── */
+  .screen { position: absolute; inset: 0; display: none; flex-direction: column; }
+  .screen.active { display: flex; }
+
+  /* ── HOME ── */
+  #home {
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    padding: 20px;
+  }
+  .logo {
+    font-size: 10px;
+    letter-spacing: 0.28em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .home-title {
+    font-size: 36px;
+    font-weight: 800;
+    letter-spacing: -1px;
+    color: var(--text);
+  }
+  .home-title span { color: var(--accent); }
+  .home-actions {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .btn {
+    padding: 11px 22px;
+    border-radius: 22px;
+    font-size: 14px;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+    letter-spacing: 0.01em;
+    transition: opacity 0.15s, transform 0.1s;
+  }
+  .btn:active { transform: scale(0.96); opacity: 0.8; }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-secondary { background: var(--surface); color: var(--text); border: 1px solid var(--border); }
+  .btn-ghost { background: transparent; color: var(--muted); font-size: 13px; border: none; cursor: pointer; padding: 8px 12px; }
+
+  /* ── LIBRARY ── */
+  #library { padding: 14px 16px; gap: 10px; overflow-y: auto; }
+  .lib-header {
+    display: flex; align-items: center; justify-content: space-between;
+    flex-shrink: 0;
+  }
+  .lib-header h2 { font-size: 17px; font-weight: 700; }
+  .book-list { display: flex; flex-direction: column; gap: 8px; overflow-y: auto; flex: 1; }
+  .book-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 11px 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .book-card:active { opacity: 0.7; }
+  .book-info { flex: 1; min-width: 0; }
+  .book-title { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .book-meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .book-progress-bar { height: 3px; background: var(--border); border-radius: 2px; margin-top: 7px; overflow: hidden; }
+  .book-progress-fill { height: 100%; background: var(--accent); border-radius: 2px; }
+  .book-actions { margin-left: 12px; flex-shrink: 0; }
+  .icon-btn { background: none; border: none; cursor: pointer; padding: 4px; color: var(--muted); font-size: 16px; }
+  .icon-btn:active { color: var(--accent); }
+  .empty-lib { text-align: center; color: var(--muted); font-size: 13px; margin-top: 24px; line-height: 1.7; }
+
+  /* ── SETTINGS ── */
+  #settings { padding: 14px 16px; gap: 10px; overflow-y: auto; }
+  .settings-header { display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+  .settings-header h2 { font-size: 17px; font-weight: 700; }
+  .setting-group { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; flex-shrink: 0; }
+  .setting-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 14px; border-bottom: 1px solid var(--border);
+  }
+  .setting-row:last-child { border-bottom: none; }
+  .setting-label { font-size: 14px; }
+  .setting-label small { display: block; font-size: 11px; color: var(--muted); margin-top: 1px; }
+  .toggle {
+    width: 44px; height: 26px; background: var(--border); border-radius: 13px;
+    position: relative; cursor: pointer; border: none; flex-shrink: 0;
+    transition: background 0.2s;
+  }
+  .toggle.on { background: var(--accent); }
+  .toggle::after {
+    content: ''; position: absolute; top: 3px; left: 3px;
+    width: 20px; height: 20px; background: #fff; border-radius: 50%;
+    transition: transform 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.25);
+  }
+  .toggle.on::after { transform: translateX(18px); }
+  .wpm-display { font-size: 14px; font-weight: 700; color: var(--accent); min-width: 64px; text-align: right; }
+  .wpm-slider {
+    -webkit-appearance: none; appearance: none; width: 100%; height: 4px;
+    background: var(--border); border-radius: 2px; outline: none; margin: 8px 0 3px;
+  }
+  .wpm-slider::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 22px; height: 22px; border-radius: 50%;
+    background: var(--accent); cursor: pointer; box-shadow: 0 1px 4px rgba(0,0,0,0.3);
+  }
+  .slider-row { flex-direction: column; align-items: flex-start; }
+  .slider-labels { display: flex; justify-content: space-between; width: 100%; }
+  .slider-labels span { font-size: 10px; color: var(--muted); }
+  .theme-picker { display: flex; gap: 8px; }
+  .theme-chip {
+    padding: 6px 14px; border-radius: 14px; font-size: 12px; font-weight: 600;
+    cursor: pointer; border: 1.5px solid transparent;
+  }
+  .theme-chip.dark { background: #1a1a1a; color: #f0f0f0; }
+  .theme-chip.nature { background: #f5f0e8; color: #1a1a1a; border: 1.5px solid #d8d0c4; }
+  .theme-chip.selected { border-color: var(--accent); }
+  .log-section { flex: 1; overflow-y: auto; min-height: 0; }
+  .log-title { font-size: 11px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin-bottom: 8px; }
+  .log-item { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; margin-bottom: 6px; }
+  .log-item-title { font-size: 13px; font-weight: 600; }
+  .log-item-date { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+  /* ── READER ── */
+  #reader {
+    background: var(--bg);
+    position: relative;
+  }
+
+  /* Top bar — full contrast, readable size */
+  .reader-topbar {
+    position: absolute; top: 0; left: 0; right: 0;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 16px 0;
+    z-index: 10;
+    pointer-events: none;
+  }
+  .reader-topbar > * { pointer-events: all; }
+
+  .reader-wpm {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text);
+    letter-spacing: 0.02em;
+    opacity: 0.7;
+  }
+  .reader-percent {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text);
+    letter-spacing: 0.02em;
+    opacity: 0.7;
+  }
+  .reader-menu-btn {
+    background: none; border: none; cursor: pointer; padding: 2px 6px;
+    color: var(--text); font-size: 20px; line-height: 1; opacity: 0.6;
+  }
+
+  /* Word stage — fills entire screen, word centered */
+  .word-stage {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* Focus guide lines above/below pivot */
+  .focus-guide {
+    position: absolute;
+    left: 50%;
+    top: 0; bottom: 0;
+    width: 0;
+    pointer-events: none;
+  }
+  .focus-guide::before, .focus-guide::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    width: 1.5px;
+    background: var(--text);
+    opacity: 0.15;
+    transform: translateX(-50%);
+  }
+  .focus-guide::before { top: 0; height: calc(50% - 2.5em); }
+  .focus-guide::after  { bottom: 0; height: calc(50% - 2.5em); }
+
+  /* THE WORD — big, bold, centered */
+  .word-display {
+    font-size: 13vh;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    display: flex;
+    align-items: baseline;
+    justify-content: center;
+    white-space: nowrap;
+    line-height: 1;
+    /* Scale down if word is too wide */
+    max-width: 92vw;
+    overflow: visible;
+  }
+  /* Dynamic scaling handled by JS for very long words */
+  .word-before { color: var(--text); }
+  .word-pivot  { color: var(--accent); }
+  .word-after  { color: var(--text); }
+
+  /* Progress bar — thin, at bottom */
+  .reader-bottom {
+    position: absolute; bottom: 0; left: 0; right: 0;
+    padding: 0 16px 10px;
+    z-index: 10;
+  }
+  .progress-track {
+    height: 2px; background: var(--border); border-radius: 2px; overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%; background: var(--accent); border-radius: 2px;
+    transition: width 0.15s linear;
+  }
+
+  /* Swipe hint */
+  .swipe-hint {
+    position: absolute; right: 8px; top: 50%;
+    transform: translateY(-50%);
+    font-size: 9px; color: var(--text); opacity: 0.2;
+    writing-mode: vertical-rl;
+    letter-spacing: 0.12em;
+    pointer-events: none;
+    text-transform: uppercase;
+    font-weight: 600;
+  }
+
+  /* Pause overlay */
+  .pause-overlay {
+    position: absolute; inset: 0;
+    background: var(--bg);
+    opacity: 0.96;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 14px; z-index: 20;
+  }
+  .pause-overlay.hidden { display: none; }
+  .pause-label {
+    font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase;
+    color: var(--muted); font-weight: 600;
+  }
+  .pause-book-name { font-size: 13px; color: var(--muted); max-width: 80%; text-align: center; }
+  .pause-actions { display: flex; gap: 10px; }
+
+  /* Reader menu overlay */
+  .reader-menu-overlay {
+    position: absolute; inset: 0; z-index: 30;
+    background: var(--bg);
+    display: flex; flex-direction: column;
+    padding: 14px 16px;
+    gap: 12px;
+  }
+  .reader-menu-overlay.hidden { display: none; }
+  .reader-menu-overlay h3 { font-size: 15px; font-weight: 700; }
+  .reader-menu-grid { display: flex; gap: 8px; flex-wrap: wrap; }
+
+  /* Import overlay */
+  .import-overlay {
+    position: absolute; inset: 0; z-index: 50;
+    background: var(--bg);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 12px; padding: 20px 24px;
+  }
+  .import-overlay.hidden { display: none; }
+  .import-header { width: 100%; display: flex; align-items: center; justify-content: space-between; }
+  .import-header-title { font-size: 16px; font-weight: 700; }
+  .import-drop {
+    width: 100%; border: 1.5px dashed var(--border); border-radius: 16px;
+    padding: 20px; text-align: center; cursor: pointer;
+  }
+  .import-drop-icon { font-size: 26px; margin-bottom: 6px; }
+  .import-drop p { font-size: 13px; color: var(--muted); line-height: 1.5; }
+  #file-input { display: none; }
+  .import-title-input {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 11px 14px;
+    font-size: 14px;
+    color: var(--text);
+    outline: none;
+    font-family: inherit;
+  }
+  .import-title-input::placeholder { color: var(--muted); }
+  .import-actions { display: flex; gap: 10px; width: 100%; }
+  .import-actions .btn { flex: 1; }
+
+  /* Toast */
+  .toast {
+    position: absolute; bottom: 18px; left: 50%; transform: translateX(-50%);
+    background: var(--surface); border: 1px solid var(--border);
+    color: var(--text); font-size: 13px; font-weight: 500;
+    padding: 9px 18px; border-radius: 22px;
+    z-index: 100; white-space: nowrap; opacity: 0; transition: opacity 0.3s;
+    pointer-events: none;
+  }
+  .toast.show { opacity: 1; }
+
+  /* Finish screen */
+  #finish {
+    align-items: center; justify-content: center; gap: 12px; padding: 24px; text-align: center;
+  }
+  .finish-icon { font-size: 40px; }
+  .finish-title { font-size: 20px; font-weight: 700; }
+  .finish-sub { font-size: 13px; color: var(--muted); line-height: 1.6; }
+
+  ::-webkit-scrollbar { display: none; }
+</style>
+</head>
+<body>
+
+<div id="app">
+
+<!-- ── HOME ── -->
+<div id="home" class="screen active">
+  <div class="logo">Speed Reader</div>
+  <div class="home-title">r<span>e</span>ad.</div>
+  <div class="home-actions">
+    <button class="btn btn-primary" onclick="showImport()">Import Book</button>
+    <button class="btn btn-secondary" onclick="showScreen('library')">Library</button>
+    <button class="btn btn-secondary" onclick="showScreen('settings')">Settings</button>
+  </div>
+  <div id="resume-row" style="display:none; margin-top:2px;">
+    <button class="btn btn-ghost" id="resume-btn" onclick="resumeReading()">▶ Continue reading</button>
+  </div>
+</div>
+
+<!-- ── LIBRARY ── -->
+<div id="library" class="screen">
+  <div class="lib-header">
+    <h2>Library</h2>
+    <button class="btn btn-secondary" style="font-size:12px;padding:7px 14px;" onclick="showImport()">+ Import</button>
+  </div>
+  <div class="book-list" id="book-list"></div>
+  <div style="flex-shrink:0; padding-top:6px;">
+    <button class="btn btn-ghost" onclick="showScreen('home')">← Back</button>
+  </div>
+</div>
+
+<!-- ── SETTINGS ── -->
+<div id="settings" class="screen">
+  <div class="settings-header">
+    <h2>Settings</h2>
+    <button class="btn btn-ghost" onclick="showScreen('home')">← Back</button>
+  </div>
+
+  <div class="setting-group">
+    <div class="setting-row">
+      <div class="setting-label">Theme</div>
+      <div class="theme-picker">
+        <div class="theme-chip dark selected" id="chip-dark" onclick="setTheme('dark')">Dark</div>
+        <div class="theme-chip nature" id="chip-nature" onclick="setTheme('nature')">Nature</div>
+      </div>
+    </div>
+    <div class="setting-row slider-row">
+      <div class="setting-label" style="width:100%;display:flex;justify-content:space-between;align-items:center;">
+        <span>Default WPM</span>
+        <span class="wpm-display" id="wpm-display">250 WPM</span>
+      </div>
+      <input type="range" class="wpm-slider" id="wpm-slider" min="100" max="800" step="25" value="250">
+      <div class="slider-labels"><span>100</span><span>400</span><span>800</span></div>
+    </div>
+    <div class="setting-row">
+      <div class="setting-label">
+        Smart pacing
+        <small>Slows on long words &amp; punctuation</small>
+      </div>
+      <button class="toggle on" id="toggle-autopause" onclick="toggleSetting('autopause')"></button>
+    </div>
+    <div class="setting-row">
+      <div class="setting-label">
+        Focus guide
+        <small>Vertical alignment lines</small>
+      </div>
+      <button class="toggle on" id="toggle-guide" onclick="toggleSetting('guide')"></button>
+    </div>
+  </div>
+
+  <div class="log-section">
+    <div class="log-title">Finished Books</div>
+    <div id="read-log"></div>
+  </div>
+</div>
+
+<!-- ── READER ── -->
+<div id="reader" class="screen">
+  <div class="reader-topbar">
+    <button class="reader-menu-btn" onclick="openReaderMenu()">⋮</button>
+    <div class="reader-wpm" id="reader-wpm-label">250 WPM</div>
+    <div class="reader-percent" id="reader-percent">0%</div>
+  </div>
+
+  <div class="swipe-hint" id="swipe-hint">WPM ↕</div>
+
+  <div class="word-stage" id="word-stage">
+    <div class="focus-guide" id="focus-guide"></div>
+    <div class="word-display" id="word-display">
+      <span class="word-before" id="word-before"></span><span
+      class="word-pivot"  id="word-pivot">r</span><span
+      class="word-after"  id="word-after"></span>
+    </div>
+  </div>
+
+  <div class="reader-bottom">
+    <div class="progress-track">
+      <div class="progress-fill" id="progress-fill" style="width:0%"></div>
+    </div>
+  </div>
+
+  <!-- Pause overlay -->
+  <div class="pause-overlay hidden" id="pause-overlay">
+    <div class="pause-label">Paused</div>
+    <div class="pause-actions">
+      <button class="btn btn-primary" onclick="play()">▶ Resume</button>
+      <button class="btn btn-secondary" onclick="showScreen('library')">Library</button>
+    </div>
+    <div class="pause-book-name" id="pause-book-title"></div>
+  </div>
+
+  <!-- Reader menu -->
+  <div class="reader-menu-overlay hidden" id="reader-menu">
+    <div style="display:flex;align-items:center;justify-content:space-between;">
+      <h3 id="reader-menu-title">Reading</h3>
+      <button class="btn btn-ghost" style="padding:4px 8px;" onclick="closeReaderMenu()">✕</button>
+    </div>
+    <div class="setting-group">
+      <div class="setting-row slider-row">
+        <div class="setting-label" style="width:100%;display:flex;justify-content:space-between;">
+          <span>Speed</span>
+          <span class="wpm-display" id="reader-wpm-ctrl">250 WPM</span>
+        </div>
+        <input type="range" class="wpm-slider" id="reader-wpm-slider" min="100" max="800" step="25" value="250">
+        <div class="slider-labels"><span>100</span><span>400</span><span>800</span></div>
+      </div>
+    </div>
+    <div class="reader-menu-grid">
+      <button class="btn btn-secondary" onclick="restartBook()">↺ Restart</button>
+      <button class="btn btn-secondary" onclick="markFinished()">✓ Mark Done</button>
+      <button class="btn btn-secondary" onclick="closeReaderMenu();showScreen('library')">Library</button>
+    </div>
+    <div style="margin-top:auto;">
+      <button class="btn btn-ghost" onclick="closeReaderMenu()">← Back to reading</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── FINISH ── -->
+<div id="finish" class="screen">
+  <div class="finish-icon">📖</div>
+  <div class="finish-title" id="finish-title">Finished!</div>
+  <div class="finish-sub" id="finish-sub">Great reading session.</div>
+  <div style="display:flex;gap:10px;margin-top:10px;">
+    <button class="btn btn-primary" onclick="showScreen('library')">Library</button>
+    <button class="btn btn-secondary" onclick="restartBook()">Read again</button>
+  </div>
+</div>
+
+<!-- ── IMPORT OVERLAY ── -->
+<div class="import-overlay hidden" id="import-overlay">
+  <div class="import-header">
+    <div class="import-header-title">Import Book</div>
+    <button class="btn btn-ghost" style="padding:4px 8px;" onclick="hideImport()">✕</button>
+  </div>
+  <div class="import-drop" onclick="document.getElementById('file-input').click()">
+    <div class="import-drop-icon">📄</div>
+    <p>Tap to select a file<br><span style="font-size:11px;">.pdf · .txt supported</span></p>
+  </div>
+  <input type="file" id="file-input" accept=".pdf,.txt" onchange="handleFileSelect(event)">
+  <input type="text" class="import-title-input" id="import-title-input" placeholder="Book title (optional)">
+  <div class="import-actions">
+    <button class="btn btn-secondary" onclick="hideImport()">Cancel</button>
+    <button class="btn btn-primary" id="import-confirm-btn" onclick="confirmImport()" disabled>Add to Library</button>
+  </div>
+  <div id="import-status" style="font-size:12px;color:var(--muted);text-align:center;min-height:16px;"></div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+</div><!-- #app -->
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script>
+// ── STATE ──
+const STORAGE_KEY = 'speedreader_v2';
+
+function defaultState() {
+  return {
+    theme: 'dark', wpm: 250, autopause: true, guide: true,
+    books: [], log: [], currentBookId: null, currentWordIndex: 0,
+  };
+}
+
+let state = (() => {
+  try {
+    const s = localStorage.getItem(STORAGE_KEY);
+    if (s) return { ...defaultState(), ...JSON.parse(s) };
+  } catch(e) {}
+  return defaultState();
+})();
+
+function saveState() {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch(e) {}
+}
+
+// ── THEME ──
+function applyTheme(t) {
+  document.getElementById('app').classList.toggle('theme-nature', t === 'nature');
+  document.getElementById('chip-dark').classList.toggle('selected', t === 'dark');
+  document.getElementById('chip-nature').classList.toggle('selected', t === 'nature');
+}
+function setTheme(t) { state.theme = t; applyTheme(t); saveState(); }
+
+// ── SCREENS ──
+function showScreen(name) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(name).classList.add('active');
+  if (name === 'library') renderLibrary();
+  if (name === 'settings') renderSettings();
+  if (name === 'home') renderHome();
+}
+
+// ── HOME ──
+function renderHome() {
+  const resumeRow = document.getElementById('resume-row');
+  const book = state.currentBookId ? state.books.find(b => b.id === state.currentBookId) : null;
+  if (book && state.currentWordIndex > 0) {
+    resumeRow.style.display = 'block';
+    const pct = Math.round((state.currentWordIndex / book.words.length) * 100);
+    document.getElementById('resume-btn').textContent = `▶ ${book.title} — ${pct}%`;
+  } else {
+    resumeRow.style.display = 'none';
+  }
+}
+
+// ── IMPORT ──
+let pendingText = '', pendingFileName = '';
+
+function showImport() {
+  pendingText = ''; pendingFileName = '';
+  document.getElementById('import-title-input').value = '';
+  document.getElementById('import-confirm-btn').disabled = true;
+  document.getElementById('import-status').textContent = '';
+  document.getElementById('file-input').value = '';
+  document.getElementById('import-overlay').classList.remove('hidden');
+}
+function hideImport() {
+  document.getElementById('import-overlay').classList.add('hidden');
+}
+
+async function handleFileSelect(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const status = document.getElementById('import-status');
+  const confirmBtn = document.getElementById('import-confirm-btn');
+  const titleInput = document.getElementById('import-title-input');
+  status.textContent = 'Processing…';
+  confirmBtn.disabled = true;
+  pendingFileName = file.name.replace(/\.[^.]+$/, '');
+  if (!titleInput.value) titleInput.value = pendingFileName;
+  try {
+    pendingText = file.name.endsWith('.pdf') ? await extractPDF(file) : await file.text();
+    const wc = pendingText.trim().split(/\s+/).filter(Boolean).length;
+    status.textContent = `${wc.toLocaleString()} words found`;
+    confirmBtn.disabled = false;
+  } catch(err) {
+    status.textContent = 'Could not read file — try a .txt file.';
+    console.error(err);
+  }
+}
+
+async function extractPDF(file) {
+  const lib = window['pdfjs-dist/build/pdf'];
+  lib.GlobalWorkerOptions.workerSrc =
+    'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  const pdf = await lib.getDocument({ data: await file.arrayBuffer() }).promise;
+  let text = '';
+  for (let i = 1; i <= pdf.numPages; i++) {
+    const page = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    text += content.items.map(item => item.str).join(' ') + ' ';
+  }
+  return text;
+}
+
+function confirmImport() {
+  if (!pendingText) return;
+  const title = document.getElementById('import-title-input').value.trim() || pendingFileName || 'Untitled';
+  const words = pendingText.trim().split(/\s+/).filter(Boolean);
+  state.books.push({ id: Date.now().toString(), title, words, addedAt: new Date().toISOString() });
+  saveState();
+  hideImport();
+  showToast(`"${title}" added`);
+  showScreen('library');
+}
+
+// ── LIBRARY ──
+function renderLibrary() {
+  const list = document.getElementById('book-list');
+  list.innerHTML = '';
+  if (!state.books.length) {
+    list.innerHTML = '<div class="empty-lib">No books yet.<br>Import a PDF or .txt file to begin.</div>';
+    return;
+  }
+  state.books.forEach(book => {
+    const prog = book.words.length > 0
+      ? Math.round(((state.currentBookId === book.id ? state.currentWordIndex : 0) / book.words.length) * 100) : 0;
+    const div = document.createElement('div');
+    div.className = 'book-card';
+    div.innerHTML = `
+      <div class="book-info">
+        <div class="book-title">${esc(book.title)}</div>
+        <div class="book-meta">${book.words.length.toLocaleString()} words · ${prog}% read</div>
+        <div class="book-progress-bar"><div class="book-progress-fill" style="width:${prog}%"></div></div>
+      </div>
+      <div class="book-actions">
+        <button class="icon-btn" onclick="event.stopPropagation();deleteBook('${book.id}')">🗑</button>
+      </div>`;
+    div.onclick = () => startBook(book.id);
+    list.appendChild(div);
+  });
+}
+
+function deleteBook(id) {
+  state.books = state.books.filter(b => b.id !== id);
+  if (state.currentBookId === id) { state.currentBookId = null; state.currentWordIndex = 0; }
+  saveState(); renderLibrary();
+}
+
+// ── SETTINGS ──
+function renderSettings() {
+  document.getElementById('wpm-slider').value = state.wpm;
+  document.getElementById('wpm-display').textContent = state.wpm + ' WPM';
+  document.getElementById('toggle-autopause').className = 'toggle' + (state.autopause ? ' on' : '');
+  document.getElementById('toggle-guide').className   = 'toggle' + (state.guide    ? ' on' : '');
+  applyTheme(state.theme);
+  renderLog();
+}
+
+document.getElementById('wpm-slider').addEventListener('input', function() {
+  state.wpm = parseInt(this.value);
+  document.getElementById('wpm-display').textContent = state.wpm + ' WPM';
+  saveState();
+});
+
+function toggleSetting(key) { state[key] = !state[key]; renderSettings(); saveState(); }
+
+function renderLog() {
+  const el = document.getElementById('read-log');
+  if (!state.log.length) {
+    el.innerHTML = '<div style="font-size:12px;color:var(--muted);">Finished books will appear here.</div>';
+    return;
+  }
+  el.innerHTML = state.log.slice().reverse().map(e => `
+    <div class="log-item">
+      <div class="log-item-title">${esc(e.title)}</div>
+      <div class="log-item-date">Finished ${formatDate(e.finishedAt)}</div>
+    </div>`).join('');
+}
+
+// ── READER ENGINE ──
+let words = [], wordIndex = 0, wpm = 250;
+let timer = null, isPlaying = false, currentBookId = null;
+let swipeStartY = null, swipeStartWpm = null;
+
+function startBook(bookId, fromIndex = null) {
+  const book = state.books.find(b => b.id === bookId);
+  if (!book || !book.words.length) { showToast('Empty book'); return; }
+  currentBookId = bookId;
+  state.currentBookId = bookId;
+  words = book.words;
+  wordIndex = fromIndex !== null ? fromIndex
+    : (state.currentBookId === bookId ? state.currentWordIndex : 0);
+  wordIndex = Math.max(0, Math.min(wordIndex, words.length - 1));
+  wpm = state.wpm;
+  updateReaderWpmSlider();
+  document.getElementById('focus-guide').style.display = state.guide ? 'block' : 'none';
+  document.getElementById('pause-book-title').textContent = book.title;
+  showScreen('reader');
+  hidePause(); closeReaderMenu(); play(); saveState();
+}
+
+function resumeReading() {
+  if (!state.currentBookId) { showScreen('library'); return; }
+  startBook(state.currentBookId, state.currentWordIndex);
+}
+
+function play() {
+  if (timer) clearTimeout(timer);
+  isPlaying = true; hidePause(); scheduleNext();
+}
+function pause() {
+  isPlaying = false;
+  if (timer) clearTimeout(timer);
+  showPause();
+  state.currentWordIndex = wordIndex; saveState();
+}
+
+function scheduleNext() {
+  if (!isPlaying) return;
+  showWord(wordIndex);
+  const word = words[wordIndex] || '';
+  const delay = calcDelay(word);
+  wordIndex++;
+  if (wordIndex >= words.length) { timer = setTimeout(finishBook, delay); return; }
+  timer = setTimeout(scheduleNext, delay);
+}
+
+function calcDelay(word) {
+  const base = 60000 / wpm;
+  if (!state.autopause) return base;
+  let m = 1;
+  const len = word.replace(/[^a-z]/gi, '').length;
+  if (len >= 11) m = 1.8;
+  else if (len >= 8) m = 1.4;
+  if (/[.!?]$/.test(word)) m *= 1.5;
+  else if (/[,;:]$/.test(word)) m *= 1.2;
+  return base * m;
+}
+
+function showWord(idx) {
+  const raw = (words[idx] || '').trim();
+  const pivot = getPivotIndex(raw);
+  document.getElementById('word-before').textContent = raw.slice(0, pivot);
+  document.getElementById('word-pivot').textContent  = raw.slice(pivot, pivot + 1);
+  document.getElementById('word-after').textContent  = raw.slice(pivot + 1);
+
+  // Scale font down for very long words so they don't overflow
+  const wordEl = document.getElementById('word-display');
+  const len = raw.length;
+  if (len > 12)      wordEl.style.fontSize = '7vh';
+  else if (len > 9)  wordEl.style.fontSize = '9vh';
+  else if (len > 6)  wordEl.style.fontSize = '11vh';
+  else               wordEl.style.fontSize = '13vh';
+
+  const pct = words.length > 1 ? (idx / (words.length - 1)) * 100 : 100;
+  document.getElementById('progress-fill').style.width = pct + '%';
+  document.getElementById('reader-percent').textContent = Math.round(pct) + '%';
+  document.getElementById('reader-wpm-label').textContent = wpm + ' WPM';
+}
+
+function getPivotIndex(word) {
+  const clean = word.replace(/[^a-zA-Z0-9]/g, '');
+  const len = clean.length;
+  if (len <= 1) return 0;
+  if (len <= 5) return 1;
+  if (len <= 9) return 2;
+  return 3;
+}
+
+function finishBook() {
+  isPlaying = false;
+  const book = state.books.find(b => b.id === currentBookId);
+  if (book) {
+    if (!state.log.find(l => l.id === book.id)) {
+      state.log.push({ id: book.id, title: book.title, finishedAt: new Date().toISOString() });
+    }
+    state.currentWordIndex = 0; saveState();
+    document.getElementById('finish-title').textContent = `Finished "${book.title}"`;
+    document.getElementById('finish-sub').textContent = `${book.words.length.toLocaleString()} words · Added to your log.`;
+  }
+  showScreen('finish');
+}
+
+function restartBook() { if (currentBookId) startBook(currentBookId, 0); }
+
+function markFinished() {
+  const book = state.books.find(b => b.id === currentBookId);
+  if (book) {
+    state.log.push({ id: book.id, title: book.title, finishedAt: new Date().toISOString() });
+    state.currentWordIndex = 0; saveState();
+    showToast('Marked as finished'); closeReaderMenu(); showScreen('library');
+  }
+}
+
+function showPause() { document.getElementById('pause-overlay').classList.remove('hidden'); }
+function hidePause() { document.getElementById('pause-overlay').classList.add('hidden'); }
+
+function openReaderMenu() {
+  pause();
+  const book = state.books.find(b => b.id === currentBookId);
+  document.getElementById('reader-menu-title').textContent = book ? book.title : 'Reading';
+  document.getElementById('reader-menu').classList.remove('hidden');
+}
+function closeReaderMenu() { document.getElementById('reader-menu').classList.add('hidden'); }
+
+function updateReaderWpmSlider() {
+  document.getElementById('reader-wpm-slider').value = wpm;
+  document.getElementById('reader-wpm-ctrl').textContent = wpm + ' WPM';
+  document.getElementById('reader-wpm-label').textContent = wpm + ' WPM';
+}
+
+document.getElementById('reader-wpm-slider').addEventListener('input', function() {
+  wpm = parseInt(this.value); state.wpm = wpm;
+  document.getElementById('reader-wpm-ctrl').textContent = wpm + ' WPM';
+  document.getElementById('reader-wpm-label').textContent = wpm + ' WPM';
+  saveState();
+});
+
+// ── TOUCH CONTROLS ──
+const wordStage = document.getElementById('word-stage');
+
+wordStage.addEventListener('click', e => {
+  const rect = wordStage.getBoundingClientRect();
+  const relX = e.clientX - rect.left;
+  const w = rect.width;
+  if (relX < w * 0.2) {
+    wordIndex = Math.max(0, wordIndex - 12);
+    if (!isPlaying) showWord(wordIndex);
+  } else if (relX > w * 0.8) {
+    wordIndex = Math.min(words.length - 1, wordIndex + 10);
+    if (!isPlaying) showWord(wordIndex);
+  } else {
+    if (isPlaying) pause(); else play();
+  }
+});
+
+wordStage.addEventListener('touchstart', e => {
+  swipeStartY = e.touches[0].clientY; swipeStartWpm = wpm;
+}, { passive: true });
+
+wordStage.addEventListener('touchmove', e => {
+  if (swipeStartY === null) return;
+  const dy = swipeStartY - e.touches[0].clientY;
+  const newWpm = Math.max(100, Math.min(800, swipeStartWpm + Math.round(dy / 2)));
+  if (newWpm !== wpm) {
+    wpm = newWpm; state.wpm = wpm;
+    updateReaderWpmSlider();
+    document.getElementById('swipe-hint').style.opacity = '0.7';
+    saveState();
+  }
+}, { passive: true });
+
+wordStage.addEventListener('touchend', () => {
+  swipeStartY = null;
+  setTimeout(() => { document.getElementById('swipe-hint').style.opacity = '0.2'; }, 1200);
+});
+
+// ── UTILS ──
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2200);
+}
+function esc(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function formatDate(iso) {
+  try { return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); }
+  catch(e) { return ''; }
+}
+
+// ── INIT ──
+applyTheme(state.theme);
+renderHome();
+</script>
+</body>
+</html>
